@@ -2,12 +2,13 @@
 # To compile, simply run "scons" in the same directory as this file.
 # If compiling on windows, you may need to modify the libpath list so that you
 # can properly load external libraries.
+#
 
 srcs = Split('''
     main.cpp
     GenusZZ.cpp
-    Ideal.cpp
-    NeighborIterator.cpp
+    IdealZZ.cpp
+    NeighborIteratorZZ.cpp
     QuadFormZZ.cpp
 ''')
 

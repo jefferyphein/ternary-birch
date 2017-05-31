@@ -11,6 +11,7 @@ class QuadForm
 {
 public:
     QuadForm(const QuadForm<R,F>&) = default;
+
     QuadForm(const R& a, const R& b, const R& c,
              const R& f, const R& g, const R& h);
     QuadForm(const R& disc,
@@ -19,14 +20,16 @@ public:
 
     ~QuadForm() = default;
 
-    inline const R& a(void) const;
-    inline const R& b(void) const;
-    inline const R& c(void) const;
-    inline const R& f(void) const;
-    inline const R& g(void) const;
-    inline const R& h(void) const;
-    inline const R& discriminant() const;
-    inline std::shared_ptr<Isometry<R,F>> isometry() const;
+    const R& a(void) const;
+    const R& b(void) const;
+    const R& c(void) const;
+    const R& f(void) const;
+    const R& g(void) const;
+    const R& h(void) const;
+    const R& discriminant() const;
+
+    std::shared_ptr<Isometry<R,F>> isometry() const;
+    void isometry(std::shared_ptr<Isometry<R,F>> s);
 
     R evaluate(const R& x, const R& y, const R& z) const;
     R evaluate(const std::vector<R>& vec) const;
@@ -127,6 +130,12 @@ template<typename R, typename F>
 std::shared_ptr<Isometry<R,F>> QuadForm<R,F>::isometry(void) const
 {
     return this->s_;
+}
+
+template<typename R, typename F>
+void QuadForm<R,F>::isometry(std::shared_ptr<Isometry<R,F>> s)
+{
+    this->s_ = s;
 }
 
 template<typename R, typename F>

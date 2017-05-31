@@ -19,9 +19,7 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
     mpz_class g = q.g();
     mpz_class h = q.h();
 
-    auto s = std::shared_ptr<IsometryQQ>(
-        new IsometryQQ(true)
-    );
+    auto s = std::make_shared<IsometryQQ>(true);
 
     // flag controlling the initial reduction loop.
     bool flag = true;
@@ -421,9 +419,7 @@ printf("t\n");
 
     assert( s->is_isometry(q, a, b, c, f, g, h) );
 
-    auto qq = std::shared_ptr<QuadFormZZ>(
-        new QuadForm(q.disc_, a, b, c, f, g, h)
-    );
+    auto qq = std::make_shared<QuadFormZZ>(q.disc_, a, b, c, f, g, h);
 
     qq->s_ = saveIsometry ? s : std::make_shared<IsometryQQ>(true);
     qq->reduced_ = true;

@@ -2,6 +2,7 @@
 #define __GENUS_H
 
 #include <memory>
+#include <cassert>
 #include "QuadForm.h"
 #include "Prime.h"
 #include "NeighborIterator.h"
@@ -116,13 +117,29 @@ void Genus<R,F>::compute_genus(void)
         NeighborIterator<R,F> it(cur, p);
 
         // Get the first p-neighbor.
-        std::shared_ptr<QuadForm<R,F>> qq = it.next_neighbor();
+        std::shared_ptr<QuadForm<R,F>> pn = it.next_neighbor();
 
         // Loop over all p-neighbors.
-        while (qq != nullptr)
+        while (pn != nullptr)
         {
+#ifdef DEBUG
+            assert( pn->isometry()->is_isometry(*this->q_, *pn) );
+#endif
+
+            // Get the reduced form of this neighbor.
+            std::shared_ptr<QuadForm<R,F>> qq = QuadForm<R,F>::reduce(*pn);
+
+            // Multiply the p-neighbor isometry on the right by the reduction
+            // isometry. This now represents an isometry from the original form
+            // to the genus representative isometric to this p-neighbor.
+            pn->isometry()->multiply_on_right_by(qq->isometry());
+
+#ifdef DEBUG
+            assert( pn->isometry()->is_isometry(*this->q_, *qq) );
+#endif
+
             // Get the next p-neighbor.
-            qq = it.next_neighbor();
+            pn = it.next_neighbor();
         }
 
         ptr = ptr->next_;

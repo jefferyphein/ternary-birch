@@ -45,8 +45,35 @@ public:
     {
         for (mpz_class& x : vec)
         {
-            if (x > (p-1)/2) { x -= p; }
+            if (p == 2 && x != 0) { x = 1; }
+            else if (x > (p-1)/2) { x -= p; }
             else if (-x > (p-1)/2) { x += p; }
+        }
+    }
+
+    static void normalize_vector(std::vector<mpz_class>& vec, const mpz_class& p)
+    {
+        if (vec.size() != 3)
+        {
+            throw std::runtime_error("Vector must be three-dimensional.");
+        }
+
+        if (vec[0] != 0)
+        {
+            mpz_class inv = Math::modinv(vec[0], p);
+            vec[0] = 1;
+            vec[1] = (vec[1] * inv) % p;
+            vec[2] = (vec[2] * inv) % p;
+        }
+        else if (vec[1] != 0)
+        {
+            mpz_class inv = Math::modinv(vec[1], p);
+            vec[1] = 1;
+            vec[2] = (vec[2] * inv) % p;
+        }
+        else
+        {
+            vec[2] = 1;
         }
     }
 
