@@ -34,6 +34,8 @@ public:
     R evaluate(const R& x, const R& y, const R& z) const;
     R evaluate(const std::vector<R>& vec) const;
 
+    int64_t compare(std::shared_ptr<QuadForm<R,F>> q) const;
+
     void print(std::ostream& os) const;
 
     std::vector<R> isotropic_vector(std::shared_ptr<Prime<R,F>> pR) const;
@@ -171,6 +173,24 @@ void QuadForm<R,F>::print(std::ostream& os) const
 {
     os << this->a_ << " " << this->b_ << " " << this->c_ << " "
        << this->f_ << " " << this->g_ << " " << this->h_;
+}
+
+template<typename R, typename F>
+int64_t QuadForm<R,F>::compare(std::shared_ptr<QuadForm<R,F>> q) const
+{
+    if (this->a_ < q->a()) { return 1; }
+    else if (this->a_ > q->a()) { return -1; }
+    else if (this->b_ < q->b()) { return 1; }
+    else if (this->b_ > q->b()) { return -1; }
+    else if (this->c_ < q->c()) { return 1; }
+    else if (this->c_ > q->c()) { return -1; }
+    else if (this->f_ < q->f()) { return 1; }
+    else if (this->f_ > q->f()) { return -1; }
+    else if (this->g_ < q->g()) { return 1; }
+    else if (this->g_ > q->g()) { return -1; }
+    else if (this->h_ < q->h()) { return 1; }
+    else if (this->h_ > q->h()) { return -1; }
+    else { return 0; }
 }
 
 #endif // __QUAD_FORM_H_
