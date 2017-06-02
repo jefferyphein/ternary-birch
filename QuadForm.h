@@ -2,6 +2,7 @@
 #define __QUAD_FORM_H_
 
 #include <memory>
+#include <iomanip>
 #include <gmpxx.h>
 #include "Isometry.h"
 #include "Prime.h"
@@ -18,8 +19,6 @@ public:
              const R& a, const R& b, const R& c,
              const R& f, const R& g, const R& h);
 
-    ~QuadForm() = default;
-
     const R& a(void) const;
     const R& b(void) const;
     const R& c(void) const;
@@ -34,7 +33,6 @@ public:
     R evaluate(const R& x, const R& y, const R& z) const;
     R evaluate(const std::vector<R>& vec) const;
 
-    int64_t compare(std::shared_ptr<QuadForm<R,F>> q) const;
 
     void print(std::ostream& os) const;
 
@@ -176,21 +174,40 @@ void QuadForm<R,F>::print(std::ostream& os) const
 }
 
 template<typename R, typename F>
-int64_t QuadForm<R,F>::compare(std::shared_ptr<QuadForm<R,F>> q) const
+bool operator<(const QuadForm<R,F>& q1, const QuadForm<R,F>& q2)
 {
-    if (this->a_ < q->a()) { return 1; }
-    else if (this->a_ > q->a()) { return -1; }
-    else if (this->b_ < q->b()) { return 1; }
-    else if (this->b_ > q->b()) { return -1; }
-    else if (this->c_ < q->c()) { return 1; }
-    else if (this->c_ > q->c()) { return -1; }
-    else if (this->f_ < q->f()) { return 1; }
-    else if (this->f_ > q->f()) { return -1; }
-    else if (this->g_ < q->g()) { return 1; }
-    else if (this->g_ > q->g()) { return -1; }
-    else if (this->h_ < q->h()) { return 1; }
-    else if (this->h_ > q->h()) { return -1; }
-    else { return 0; }
+    if (q1.a() < q2.a()) { return true; }
+    else if (q1.a() > q2.a()) { return false; }
+    else if (q1.b() < q2.b()) { return true; }
+    else if (q1.b() > q2.b()) { return false; }
+    else if (q1.c() < q2.c()) { return true; }
+    else if (q1.c() > q2.c()) { return false; }
+    else if (q1.f() < q2.f()) { return true; }
+    else if (q1.f() > q2.f()) { return false; }
+    else if (q1.g() < q2.g()) { return true; }
+    else if (q1.g() > q2.g()) { return false; }
+    else if (q1.h() < q2.h()) { return true; }
+    else if (q1.h() > q2.g()) { return false; }
+    else { return false; }
+}
+
+template<typename R, typename F>
+bool operator<(std::shared_ptr<QuadForm<R,F>> q1, std::shared_ptr<QuadForm<R,F>> q2)
+{
+    return *q1 < *q2;
+//    if (q1->a() < q2->a()) { return true; }
+//    else if (q1->a() > q2->a()) { return false; }
+//    else if (q1->b() < q2->b()) { return true; }
+//    else if (q1->b() > q2->b()) { return false; }
+//    else if (q1->c() < q2->c()) { return true; }
+//    else if (q1->c() > q2->c()) { return false; }
+//    else if (q1->f() < q2->f()) { return true; }
+//    else if (q1->f() > q2->f()) { return false; }
+//    else if (q1->g() < q2->g()) { return true; }
+//    else if (q1->g() > q2->g()) { return false; }
+//    else if (q1->h() < q2->h()) { return true; }
+//    else if (q1->h() > q2->g()) { return false; }
+//    else { return false; }
 }
 
 #endif // __QUAD_FORM_H_

@@ -41,7 +41,7 @@ int main(int argc, char** argv)
     }
 
     QuadFormZZ q(a, b, c, f, g, h);
-    std::cout << q.discriminant() << std::endl;
+    //std::cout << q.discriminant() << std::endl;
 
     GenusZZ genus(q);
     genus.print();

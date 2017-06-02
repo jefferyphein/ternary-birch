@@ -572,3 +572,16 @@ std::vector<mpz_class> QuadFormZZ::isotropic_vector(std::shared_ptr<PrimeZZ> pR)
     Math::fix_vector(vec, p);
     return vec;
 }
+
+//template<>
+//int64_t QuadFormZZ::hash_function(const QuadFormZZ& q)
+//{
+//    int64_t h = 0;
+//    h = (((h << 4) ^ (mpz_get_si(q.a().get_mpz_t()))) * 37) & 0xffffffffffffffffL;
+//    h = (((h << 5) ^ (mpz_get_si(q.b().get_mpz_t()))) * 101) & 0xffffffffffffffffL;
+//    h = (((h << 6) ^ (mpz_get_si(q.c().get_mpz_t()))) * 199) & 0xffffffffffffffffL;
+//    h = (((h << 7) ^ (mpz_get_si(q.f().get_mpz_t()))) * 683) & 0xffffffffffffffffL;
+//    h = (((h << 8) ^ (mpz_get_si(q.g().get_mpz_t()))) * 827) & 0xffffffffffffffffL;
+//    h = (((h << 9) ^ (mpz_get_si(q.h().get_mpz_t()))) * 941) & 0xffffffffffffffffL;
+//    return h;
+//}
