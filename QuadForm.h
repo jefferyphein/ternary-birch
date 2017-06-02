@@ -191,23 +191,4 @@ bool operator<(const QuadForm<R,F>& q1, const QuadForm<R,F>& q2)
     else { return false; }
 }
 
-template<typename R, typename F>
-bool operator<(std::shared_ptr<QuadForm<R,F>> q1, std::shared_ptr<QuadForm<R,F>> q2)
-{
-    return *q1 < *q2;
-//    if (q1->a() < q2->a()) { return true; }
-//    else if (q1->a() > q2->a()) { return false; }
-//    else if (q1->b() < q2->b()) { return true; }
-//    else if (q1->b() > q2->b()) { return false; }
-//    else if (q1->c() < q2->c()) { return true; }
-//    else if (q1->c() > q2->c()) { return false; }
-//    else if (q1->f() < q2->f()) { return true; }
-//    else if (q1->f() > q2->f()) { return false; }
-//    else if (q1->g() < q2->g()) { return true; }
-//    else if (q1->g() > q2->g()) { return false; }
-//    else if (q1->h() < q2->h()) { return true; }
-//    else if (q1->h() > q2->g()) { return false; }
-//    else { return false; }
-}
-
 #endif // __QUAD_FORM_H_
