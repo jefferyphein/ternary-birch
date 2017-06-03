@@ -338,7 +338,7 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
     assert( s->is_isometry(*this->q_, a, b, c, f, g, h) );
 #endif
 
-    //s->multiply_on_left_by(this->q_->isometry());
+    s->multiply_on_left_by(this->q_->isometry());
 
     auto qq = std::make_shared<QuadFormZZ>(this->q_->discriminant(),
                                            a, b, c, f, g, h);
@@ -380,10 +380,6 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::next_neighbor(void)
 #endif
 
     auto qq = this->build_neighbor(vec);
-
-//    std::cout << "Q_{" << p << "}(" << vec[0] << ","
-//              << vec[1] << "," 
-//              << vec[2] << ") = " << (this->q_->evaluate(vec) % p) << std::endl;
 
     ++this->pos_;
 

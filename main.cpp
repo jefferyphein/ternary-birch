@@ -46,9 +46,39 @@ int main(int argc, char** argv)
     std::cout << q.discriminant() << std::endl;
 
     GenusZZ genus(q);
-    std::vector<mpz_class> vec = {11, 13};
-    CharacterZZ repr(vec);
+
+    //std::vector<mpz_class> ps1 = {577};
+    //std::vector<mpz_class> ps2 = {12011};
+    //std::vector<mpz_class> ps3 = {577, 12011};
+    //std::vector<mpz_class> ps4 = {};
+
+    //CharacterZZ r1(ps1);
+    //CharacterZZ r2(ps2);
+    //CharacterZZ r3(ps3);
+    //CharacterZZ r4(ps4);
+
+    //genus.add_character(r1);
+    //genus.add_character(r2);
+    //genus.add_character(r3);
+    //genus.add_character(r4);
+
+    std::vector<mpz_class> ps1 = {11, 13};
+    CharacterZZ repr(ps1);
     genus.add_character(repr);
+
+    std::vector<mpz_class> ps2 = {11, 19};
+    CharacterZZ repr2(ps2);
+    genus.add_character(repr2);
+
+    std::vector<mpz_class> ps3 = {19, 13};
+    CharacterZZ repr3(ps3);
+    genus.add_character(repr3);
+
+    std::vector<mpz_class> ps4 = {13, 23};
+    CharacterZZ repr4(ps4);
+    genus.add_character(repr4);
+
+    genus.compute_genus();
     genus.print();
 
     return EXIT_SUCCESS;

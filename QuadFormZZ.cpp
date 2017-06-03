@@ -426,6 +426,10 @@ printf("t\n");
     qq->s_ = saveIsometry ? s : std::make_shared<IsometryQQ>(true);
     qq->reduced_ = true;
 
+#ifdef DEBUG
+    assert( qq->isometry()->is_isometry(q, *qq) );
+#endif
+
     return qq;
 }
 

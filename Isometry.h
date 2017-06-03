@@ -37,6 +37,7 @@ public:
     Isometry(F a11, F a12, F a13,
              F a21, F a22, F a23,
              F a31, F a32, F a33);
+    Isometry(const Isometry<R,F>&) = default;
 
     void print(std::ostream& os) const;
 
@@ -57,6 +58,8 @@ public:
     F trace(void) const;
 
     std::shared_ptr<Isometry<R,F>> inverse(void) const;
+
+    std::shared_ptr<Isometry<R,F>> conjugate_by(const Isometry<R,F>& s) const;
 
 private:
     F a11, a12, a13, a21, a22, a23, a31, a32, a33;
@@ -261,7 +264,7 @@ std::shared_ptr<Isometry<R,F>> Isometry<R,F>::inverse(void) const
     F a32 = this->a32;
     F a33 = this->a33;
 
-    Isometry<R,F> inv = std::make_shared<Isometry<R,F>>(false);
+    auto inv = std::make_shared<Isometry<R,F>>();
     inv->a11 = a22 * a33 - a23 * a32;
     inv->a12 = a13 * a32 - a12 * a33;
     inv->a13 = a12 * a23 - a13 * a22;
@@ -273,6 +276,15 @@ std::shared_ptr<Isometry<R,F>> Isometry<R,F>::inverse(void) const
     inv->a33 = a11 * a22 - a12 * a21;
 
     return inv;
+}
+
+template<typename R, typename F>
+std::shared_ptr<Isometry<R,F>> Isometry<R,F>::conjugate_by(const Isometry<R,F>& s) const
+{
+    std::shared_ptr<Isometry<R,F>> c = std::make_shared<Isometry<R,F>>(*this);
+    c->multiply_on_left_by(std::make_shared<Isometry<R,F>>(s));
+    c->multiply_on_right_by(s.inverse());
+    return c;
 }
 
 template<typename R, typename F>
