@@ -4,11 +4,31 @@
 #include <memory>
 #include <iomanip>
 #include <cassert>
+#include <unordered_set>
 #include <set>
-#include <functional>
 #include "QuadForm.h"
 #include "Prime.h"
 #include "NeighborIterator.h"
+#include "Representation.h"
+
+template<typename R, typename F>
+class GenusRep
+{
+public:
+    typedef std::shared_ptr<QuadForm<R,F>> QuadFormPtr;
+
+    GenusRep(QuadFormPtr qPtr);
+
+    int64_t pos(void) const;
+    void pos(int64_t x);
+    QuadFormPtr quad_form(void) const;
+
+    bool operator==(const GenusRep<R,F>& rep) const;
+    bool operator<(const GenusRep<R,F>& rep) const;
+private:
+    QuadFormPtr q_;
+    int64_t pos_ = -1;
+};
 
 template<typename R, typename F>
 class Genus
@@ -27,13 +47,14 @@ public:
     size_t size(void) const;
 
 private:
-    std::set<QuadForm<R,F>> genusSet_;
+    /* An unordered set which stores distinct genus representatives. */
+    std::unordered_set<GenusRep<R,F>> genusReps_;
 
     /* Computes the full genus. */
     void compute_genus(void);
 
     /* A vector of shared QuadForm pointers. An unordered list of the genus. */
-    std::vector<QuadFormPtr> genusReps_;
+    std::vector<QuadFormPtr> genusVec_;
 
     /* A pointer to the originating form. */
     QuadFormPtr q_;
@@ -43,7 +64,58 @@ private:
 
     /* Flag indicating whether the genus has been computed in full. */
     bool computed_ = false;
+
+    /* A set of representations to compute. */
+    std::set<Representation<R,F>> reprSet_;
 };
+
+template<typename R, typename F>
+GenusRep<R,F>::GenusRep(QuadFormPtr q)
+{
+    this->q_ = q;
+}
+
+template<typename R, typename F>
+int64_t GenusRep<R,F>::pos(void) const
+{
+    return this->pos_;
+}
+
+template<typename R, typename F>
+void GenusRep<R,F>::pos(int64_t x)
+{
+    this->pos_ = x;
+}
+
+template<typename R, typename F>
+std::shared_ptr<QuadForm<R,F>> GenusRep<R,F>::quad_form(void) const
+{
+    return this->q_;
+}
+
+template<typename R, typename F>
+bool GenusRep<R,F>::operator==(const GenusRep<R,F>& rep) const
+{
+    return *(rep.quad_form()) == *this->q_;
+}
+
+template<typename R, typename F>
+bool GenusRep<R,F>::operator<(const GenusRep<R,F>& rep) const
+{
+    return *this->q_ < *(rep.quad_form());
+}
+
+namespace std
+{
+    template<typename R, typename F>
+    struct hash<GenusRep<R,F>>
+    {
+        int64_t operator()(const GenusRep<R,F>& rep) const
+        {
+            return rep.quad_form()->hash_value();
+        }
+    };
+}
 
 template<typename R, typename F>
 Genus<R,F>::Genus(const QuadForm<R,F>& q)
@@ -71,19 +143,22 @@ void Genus<R,F>::compute_genus(void)
     // Do nothing if the genus has already been computed.
     if (this->computed_) { return; }
 
-    // Insert the initial quadratic form.
-    this->genusSet_.insert(*this->q_);
-    this->genusReps_.push_back(this->q_);
+    // The initial genus representative.
+    GenusRep<R,F> gr(this->q_);
+
+    // Initialize the genus.
+    this->genusReps_.insert(gr);
+    this->genusVec_.push_back(this->q_);
 
     // Determine the smallest good prime.
     std::shared_ptr<Prime<R,F>> p = this->smallest_good_prime();
 
     // Loop over all genus representatives as the genus is built.
     int64_t index = 0;
-    while (index < this->genusReps_.size())
+    while (index < this->genusVec_.size())
     {
         // The current genus representative.
-        QuadFormPtr cur = this->genusReps_[index++];
+        QuadFormPtr cur = this->genusVec_[index++];
 
         // The neighbor iterator.
         NeighborIterator<R,F> it(cur, p);
@@ -97,11 +172,14 @@ void Genus<R,F>::compute_genus(void)
             // Reduce the p-neighbor.
             QuadFormPtr qq = QuadForm<R,F>::reduce(*pn);
 
+            // Create a genus representative object.
+            GenusRep<R,F> rep(qq);
+
             // Check whether this form is already in the genus.
-            if (this->genusSet_.count(*qq) == 0)
+            if (this->genusReps_.count(rep) == 0)
             {
-                this->genusSet_.insert(*qq);
-                this->genusReps_.push_back(qq);
+                this->genusReps_.insert(rep);
+                this->genusVec_.push_back(qq);
             }
 
             // Get the next p-neighbor.
@@ -113,10 +191,15 @@ void Genus<R,F>::compute_genus(void)
 template<typename R, typename F>
 void Genus<R,F>::print(void) const
 {
-    for (auto& q : this->genusSet_)
-    {
-        std::cout << q << std::endl;
-    }
+    //for (auto& q : this->genusVec_)
+    //{
+    //    auto vec = q->automorphisms();
+    //    for (auto& aut : vec)
+    //    {
+    //        assert( aut->is_automorphism(*q) );
+    //    }
+    //}
+    std::cout << this->genusVec_.size() << std::endl;
 }
 
 #endif // __GENUS_H_

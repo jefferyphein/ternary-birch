@@ -130,6 +130,20 @@ public:
         // Make the compiler happy.
         return 0;
     }
+
+    static int64_t valuation(mpq_class x, mpz_class p)
+    {
+        mpz_class num = x.get_num();
+        if (num == 0) { return 0; }
+
+        mpz_class den = x.get_den();
+        if (num == 0) { return 0; }
+
+        int64_t count = 0;
+        while (num % p == 0) { ++count; num /= p; }
+        while (den % p == 0) { --count; den /= p; }
+        return count;
+    }
 };
 
 #endif // __MATH_H_

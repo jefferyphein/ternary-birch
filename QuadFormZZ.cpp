@@ -3,9 +3,11 @@
 #include "QuadForm.h"
 #include "Prime.h"
 #include "Math.h"
+#include "AutomorphismZZ.h"
 
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
 typedef Isometry<mpz_class, mpq_class> IsometryQQ;
+typedef std::shared_ptr<IsometryQQ> IsometryQQPtr;
 typedef Prime<mpz_class, mpq_class> PrimeZZ;
 
 template<>
@@ -417,7 +419,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
 printf("t\n");
     }
 
+#ifdef DEBUG
     assert( s->is_isometry(q, a, b, c, f, g, h) );
+#endif
 
     auto qq = std::make_shared<QuadFormZZ>(q.disc_, a, b, c, f, g, h);
 
@@ -573,15 +577,606 @@ std::vector<mpz_class> QuadFormZZ::isotropic_vector(std::shared_ptr<PrimeZZ> pR)
     return vec;
 }
 
-//template<>
-//int64_t QuadFormZZ::hash_function(const QuadFormZZ& q)
-//{
-//    int64_t h = 0;
-//    h = (((h << 4) ^ (mpz_get_si(q.a().get_mpz_t()))) * 37) & 0xffffffffffffffffL;
-//    h = (((h << 5) ^ (mpz_get_si(q.b().get_mpz_t()))) * 101) & 0xffffffffffffffffL;
-//    h = (((h << 6) ^ (mpz_get_si(q.c().get_mpz_t()))) * 199) & 0xffffffffffffffffL;
-//    h = (((h << 7) ^ (mpz_get_si(q.f().get_mpz_t()))) * 683) & 0xffffffffffffffffL;
-//    h = (((h << 8) ^ (mpz_get_si(q.g().get_mpz_t()))) * 827) & 0xffffffffffffffffL;
-//    h = (((h << 9) ^ (mpz_get_si(q.h().get_mpz_t()))) * 941) & 0xffffffffffffffffL;
-//    return h;
-//}
+template<>
+int64_t QuadFormZZ::hash_value() const
+{
+    int64_t h = 0;
+    h = ((h << 12) ^ (mpz_get_si(this->a_.get_mpz_t()) * 37));
+    h = ((h << 12) ^ (mpz_get_si(this->b_.get_mpz_t()) * 101));
+    h = ((h << 12) ^ (mpz_get_si(this->c_.get_mpz_t()) * 199));
+    h = ((h << 12) ^ (mpz_get_si(this->f_.get_mpz_t()) * 683));
+    h = ((h << 12) ^ (mpz_get_si(this->g_.get_mpz_t()) * 827));
+    h = ((h << 12) ^ (mpz_get_si(this->h_.get_mpz_t()) * 941));
+    return h;
+}
+
+// This code is adapted form Sage's codebase.
+bool border(const QuadFormZZ& q, int64_t n)
+{
+    switch (n)
+    {
+        case 1:
+            return (q.a() == q.h()) && (q.g() == q.f()*2);
+        case 2:
+            return (q.a() == q.g()) && (q.h() == q.f()*2);
+        case 3:
+            return (q.b() == q.f()) && (q.h() == q.g()*2);
+        case 4:
+            return (q.a() == -q.h());
+        case 5:
+            return (q.a() == -q.g());
+        case 6:
+            return (q.b() == -q.f());
+        case 7:
+            return (q.a() + q.b() + q.f() + q.g() + q.h() == 0) &&
+                   (q.a()*2 + q.g()*2 + q.h() == 0);
+        case 8:
+            return (q.a() == q.b()) && (q.f() == q.g());
+        case 9:
+            return (q.b() == q.c()) && (q.g() == q.h());
+        case 10:
+            return (q.f() == q.g()) && (q.f() == 0);
+        case 11:
+            return (q.f() == q.h()) && (q.f() == 0);
+        case 12:
+            return (q.g() == q.h()) && (q.g() == 0);
+        case 13:
+            return (q.f() == q.g()) && (q.g() == q.h()) &&
+                   (q.h() == q.a());
+        case 14:
+            return (q.a() == q.g()) && (q.a() == q.h());
+        case 15:
+            return (q.a() == q.b()) &&
+                   (q.a() + q.b() + q.f() + q.g() + q.h() == 0);
+        case 16:
+            return (q.a() == q.b()) && (q.b() == q.c()) &&
+                   (q.a() + q.b() + q.f() + q.g() + q.h() == 0);
+        default:
+            return false;
+    }
+}
+
+template<>
+const std::vector<IsometryQQPtr>& QuadFormZZ::automorphisms(void)
+{
+    if (!this->reduced_)
+    {
+        throw std::runtime_error("A quadratic form must be reduced before"
+            " its automorphisms can be computed.");
+    }
+
+    if (this->auts_.size() > 0)
+    {
+        return this->auts_;
+    }
+
+    if (border(*this, 1))
+    {
+        if (border(*this, 2))
+        {
+            if (border(*this, 14))
+            {
+                if (border(*this, 9))
+                {
+                    this->numAuts_ = 16;
+                    this->auts_.push_back(AutomorphismZZ::A100010001);
+                    this->auts_.push_back(AutomorphismZZ::ANNN001010);
+                    this->auts_.push_back(AutomorphismZZ::ANN001000N);
+                    this->auts_.push_back(AutomorphismZZ::AN0N0N0001);
+                    this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                    this->auts_.push_back(AutomorphismZZ::A10100N010);
+                    this->auts_.push_back(AutomorphismZZ::A1100010N0);
+                    this->auts_.push_back(AutomorphismZZ::A1110N000N);
+                    return this->auts_;
+                }
+                else
+                {
+                    this->numAuts_ = 8;
+                    this->auts_.push_back(AutomorphismZZ::A100010001);
+                    this->auts_.push_back(AutomorphismZZ::ANN001000N);
+                    this->auts_.push_back(AutomorphismZZ::AN0N0N0001);
+                    this->auts_.push_back(AutomorphismZZ::A1110N000N);
+                    return this->auts_;
+                }
+            }
+        }
+        else
+        {
+            this->numAuts_ = 4;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::ANN001000N);
+            return this->auts_;
+        }
+    }
+    
+    if (border(*this, 2))
+    {
+        this->numAuts_ = 4;
+        this->auts_.push_back(AutomorphismZZ::A100010001);
+        this->auts_.push_back(AutomorphismZZ::AN0N0N0001);
+        return this->auts_;
+    }
+    
+    if (border(*this, 3))
+    {
+        this->numAuts_ = 4;
+        this->auts_.push_back(AutomorphismZZ::A100010001);
+        this->auts_.push_back(AutomorphismZZ::AN000NN001);
+        return this->auts_;
+    }
+
+    if (border(*this, 4))
+    {
+        if (border(*this, 10))
+        {
+            if (border(*this, 8))
+            {
+                this->numAuts_ = 24;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN00N1000N);
+                this->auts_.push_back(AutomorphismZZ::AN000N0001);
+                this->auts_.push_back(AutomorphismZZ::AN10N00001);
+                this->auts_.push_back(AutomorphismZZ::AN1001000N);
+                this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                this->auts_.push_back(AutomorphismZZ::A0N01N0001);
+                this->auts_.push_back(AutomorphismZZ::A010N10001);
+                this->auts_.push_back(AutomorphismZZ::A01010000N);
+                this->auts_.push_back(AutomorphismZZ::A1N00N000N);
+                this->auts_.push_back(AutomorphismZZ::A1N0100001);
+                this->auts_.push_back(AutomorphismZZ::A1001N000N);
+                return this->auts_;
+            }
+            else
+            {
+                this->numAuts_ = 8;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN000N0001);
+                this->auts_.push_back(AutomorphismZZ::AN1001000N);
+                this->auts_.push_back(AutomorphismZZ::A1N00N000N);
+                return this->auts_;
+            }
+        }
+        else
+        {
+            this->numAuts_ = 4;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::A1N00N000N);
+            return this->auts_;
+        }
+    }
+    
+    if (border(*this, 5))
+    {
+        if (border(*this, 6))
+        {
+            if (border(*this, 7))
+            {
+                if (border(*this, 8))
+                {
+                    if (border(*this, 15))
+                    {
+                        this->numAuts_ = 16;
+                        this->auts_.push_back(AutomorphismZZ::A100010001);
+                        this->auts_.push_back(AutomorphismZZ::AN0001N00N);
+                        this->auts_.push_back(AutomorphismZZ::AN010N1001);
+                        this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                        this->auts_.push_back(AutomorphismZZ::A0N1100001);
+                        this->auts_.push_back(AutomorphismZZ::A01N10N00N);
+                        this->auts_.push_back(AutomorphismZZ::A010N01001);
+                        this->auts_.push_back(AutomorphismZZ::A10N0N000N);
+                        return this->auts_;
+                    }
+                }
+                else
+                {
+                    this->numAuts_ = 8;
+                    this->auts_.push_back(AutomorphismZZ::A100010001);
+                    this->auts_.push_back(AutomorphismZZ::AN0001N00N);
+                    this->auts_.push_back(AutomorphismZZ::AN010N1001);
+                    this->auts_.push_back(AutomorphismZZ::A10N0N000N);
+                    return this->auts_;
+                }
+            }
+        }
+        else if (border(*this, 11))
+        {
+            this->numAuts_ = 8;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::AN0001000N);
+            this->auts_.push_back(AutomorphismZZ::AN010N0001);
+            this->auts_.push_back(AutomorphismZZ::A10N0N000N);
+            return this->auts_;
+        }
+        else
+        {
+            this->numAuts_ = 4;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::A10N0N000N);
+            return this->auts_;
+        }
+    }
+    
+    if (border(*this, 6))
+    {
+        if (border(*this, 12))
+        {
+            if (border(*this, 9))
+            {
+                this->numAuts_ = 24;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN000N00N1);
+                this->auts_.push_back(AutomorphismZZ::AN000N1001);
+                this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                this->auts_.push_back(AutomorphismZZ::AN00001010);
+                this->auts_.push_back(AutomorphismZZ::AN0001N00N);
+                this->auts_.push_back(AutomorphismZZ::AN0001001N);
+                this->auts_.push_back(AutomorphismZZ::A1000N000N);
+                this->auts_.push_back(AutomorphismZZ::A1000N10N0);
+                this->auts_.push_back(AutomorphismZZ::A10000N01N);
+                this->auts_.push_back(AutomorphismZZ::A1000010N1);
+                this->auts_.push_back(AutomorphismZZ::A10001N010);
+                return this->auts_;
+            }
+            else
+            {
+                this->numAuts_ = 8;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN000N1001);
+                this->auts_.push_back(AutomorphismZZ::AN0001N00N);
+                this->auts_.push_back(AutomorphismZZ::A1000N000N);
+                return this->auts_;
+            }
+        }
+        else
+        {
+            this->numAuts_ = 4;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::AN0001N00N);
+            return this->auts_;
+        }
+    }
+    
+    if (border(*this, 7))
+    {
+        if (border(*this, 8) && border(*this, 15))
+        {
+            if (border(*this, 16))
+            {
+                if (border(*this, 9))
+                {
+                    this->numAuts_ = 48;
+                    this->auts_.push_back(AutomorphismZZ::A100010001);
+                    this->auts_.push_back(AutomorphismZZ::AN00N01N10);
+                    this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                    this->auts_.push_back(AutomorphismZZ::AN01N10N00);
+                    this->auts_.push_back(AutomorphismZZ::AN010N1001);
+                    this->auts_.push_back(AutomorphismZZ::AN10N00N01);
+                    this->auts_.push_back(AutomorphismZZ::AN1001001N);
+                    this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                    this->auts_.push_back(AutomorphismZZ::A0N01N00N1);
+                    this->auts_.push_back(AutomorphismZZ::A0N10N01N0);
+                    this->auts_.push_back(AutomorphismZZ::A0N1001N01);
+                    this->auts_.push_back(AutomorphismZZ::A00N0N0N00);
+                    this->auts_.push_back(AutomorphismZZ::A00N01N10N);
+                    this->auts_.push_back(AutomorphismZZ::A001N010N1);
+                    this->auts_.push_back(AutomorphismZZ::A001100010);
+                    this->auts_.push_back(AutomorphismZZ::A01NN10010);
+                    this->auts_.push_back(AutomorphismZZ::A01N10N00N);
+                    this->auts_.push_back(AutomorphismZZ::A010001100);
+                    this->auts_.push_back(AutomorphismZZ::A01001NN10);
+                    this->auts_.push_back(AutomorphismZZ::A1N00N10N0);
+                    this->auts_.push_back(AutomorphismZZ::A1N010N100);
+                    this->auts_.push_back(AutomorphismZZ::A10N00N01N);
+                    this->auts_.push_back(AutomorphismZZ::A10N1001N0);
+                    this->auts_.push_back(AutomorphismZZ::A1001N010N);
+                    return this->auts_;
+                }
+                else
+                {
+                    this->numAuts_ = 16;
+                    this->auts_.push_back(AutomorphismZZ::A100010001);
+                    this->auts_.push_back(AutomorphismZZ::AN00N01N10);
+                    this->auts_.push_back(AutomorphismZZ::AN010N1001);
+                    this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                    this->auts_.push_back(AutomorphismZZ::A0N10N01N0);
+                    this->auts_.push_back(AutomorphismZZ::A01N10N00N);
+                    this->auts_.push_back(AutomorphismZZ::A01001NN10);
+                    this->auts_.push_back(AutomorphismZZ::A10N1001N0);
+                    return this->auts_;
+                }
+            }
+            else
+            {
+                this->numAuts_ = 8;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN010N1001);
+                this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                this->auts_.push_back(AutomorphismZZ::A01N10N00N);
+                return this->auts_;
+            }
+        }
+        else if (border(*this, 9))
+        {
+            this->numAuts_ = 12;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+            this->auts_.push_back(AutomorphismZZ::AN010N1001);
+            this->auts_.push_back(AutomorphismZZ::AN1001001N);
+            this->auts_.push_back(AutomorphismZZ::A1N00N10N0);
+            this->auts_.push_back(AutomorphismZZ::A10N00N01N);
+            return this->auts_;
+        }
+        else
+        {
+            this->numAuts_ = 4;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::AN010N1001);
+            return this->auts_;
+        }
+    }
+    
+    if (border(*this, 8))
+    {
+        if (border(*this, 9))
+        {
+            if (border(*this, 10) && border(*this, 11) && border(*this, 12))
+            {
+                this->numAuts_ = 48;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN000N0001);
+                this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                this->auts_.push_back(AutomorphismZZ::AN00001010);
+                this->auts_.push_back(AutomorphismZZ::AN0001000N);
+                this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                this->auts_.push_back(AutomorphismZZ::A0N000N100);
+                this->auts_.push_back(AutomorphismZZ::A0N0001N00);
+                this->auts_.push_back(AutomorphismZZ::A0N0100001);
+                this->auts_.push_back(AutomorphismZZ::A00NN00010);
+                this->auts_.push_back(AutomorphismZZ::A00N0N0N00);
+                this->auts_.push_back(AutomorphismZZ::A00N010100);
+                this->auts_.push_back(AutomorphismZZ::A00N1000N0);
+                this->auts_.push_back(AutomorphismZZ::A001N000N0);
+                this->auts_.push_back(AutomorphismZZ::A0010N0100);
+                this->auts_.push_back(AutomorphismZZ::A001010N00);
+                this->auts_.push_back(AutomorphismZZ::A001100010);
+                this->auts_.push_back(AutomorphismZZ::A010N00001);
+                this->auts_.push_back(AutomorphismZZ::A01000NN00);
+                this->auts_.push_back(AutomorphismZZ::A010001100);
+                this->auts_.push_back(AutomorphismZZ::A01010000N);
+                this->auts_.push_back(AutomorphismZZ::A1000N000N);
+                this->auts_.push_back(AutomorphismZZ::A10000N010);
+                this->auts_.push_back(AutomorphismZZ::A1000010N0);
+                return this->auts_;
+            }
+            else if (border(*this, 13) && border(*this, 14))
+            {
+                this->numAuts_ = 48;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::ANNN001010);
+                this->auts_.push_back(AutomorphismZZ::ANNN010100);
+                this->auts_.push_back(AutomorphismZZ::ANNN100001);
+                this->auts_.push_back(AutomorphismZZ::AN000N0111);
+                this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                this->auts_.push_back(AutomorphismZZ::AN0011100N);
+                this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                this->auts_.push_back(AutomorphismZZ::A0N000N111);
+                this->auts_.push_back(AutomorphismZZ::A0N0111N00);
+                this->auts_.push_back(AutomorphismZZ::A00NN00111);
+                this->auts_.push_back(AutomorphismZZ::A00N0N0N00);
+                this->auts_.push_back(AutomorphismZZ::A00N1110N0);
+                this->auts_.push_back(AutomorphismZZ::A001NNN100);
+                this->auts_.push_back(AutomorphismZZ::A001010NNN);
+                this->auts_.push_back(AutomorphismZZ::A001100010);
+                this->auts_.push_back(AutomorphismZZ::A010NNN001);
+                this->auts_.push_back(AutomorphismZZ::A010001100);
+                this->auts_.push_back(AutomorphismZZ::A010100NNN);
+                this->auts_.push_back(AutomorphismZZ::A100NNN010);
+                this->auts_.push_back(AutomorphismZZ::A100001NNN);
+                this->auts_.push_back(AutomorphismZZ::A111N000N0);
+                this->auts_.push_back(AutomorphismZZ::A1110N000N);
+                this->auts_.push_back(AutomorphismZZ::A11100NN00);
+                return this->auts_;
+            }
+            else
+            {
+                this->numAuts_ = 12;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                this->auts_.push_back(AutomorphismZZ::A00N0N0N00);
+                this->auts_.push_back(AutomorphismZZ::A001100010);
+                this->auts_.push_back(AutomorphismZZ::A010001100);
+                return this->auts_;
+            }
+        }
+        else if (border(*this, 10))
+        {
+            if (border(*this, 11) && border(*this, 12))
+            {
+                this->numAuts_ = 16;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN000N0001);
+                this->auts_.push_back(AutomorphismZZ::AN0001000N);
+                this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                this->auts_.push_back(AutomorphismZZ::A0N0100001);
+                this->auts_.push_back(AutomorphismZZ::A010N00001);
+                this->auts_.push_back(AutomorphismZZ::A01010000N);
+                this->auts_.push_back(AutomorphismZZ::A1000N000N);
+                return this->auts_;
+            }
+            else
+            {
+                this->numAuts_ = 8;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN000N0001);
+                this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+                this->auts_.push_back(AutomorphismZZ::A01010000N);
+                return this->auts_;
+            }
+        }
+        else if (border(*this, 14))
+        {
+            this->numAuts_ = 12;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::ANNN100001);
+            this->auts_.push_back(AutomorphismZZ::AN0011100N);
+            this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+            this->auts_.push_back(AutomorphismZZ::A010NNN001);
+            this->auts_.push_back(AutomorphismZZ::A1110N000N);
+            return this->auts_;
+        }
+        else
+        {
+            this->numAuts_ = 4;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::A0N0N0000N);
+            return this->auts_;
+        }
+    }
+    
+    if (border(*this, 9))
+    {
+        if (border(*this, 12))
+        {
+            if (border(*this, 10) && border(*this, 11))
+            {
+                this->numAuts_ = 16;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN000N0001);
+                this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                this->auts_.push_back(AutomorphismZZ::AN00001010);
+                this->auts_.push_back(AutomorphismZZ::AN0001000N);
+                this->auts_.push_back(AutomorphismZZ::A1000N000N);
+                this->auts_.push_back(AutomorphismZZ::A10000N010);
+                this->auts_.push_back(AutomorphismZZ::A1000010N0);
+                return this->auts_;
+            }
+            else
+            {
+                this->numAuts_ = 8;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                this->auts_.push_back(AutomorphismZZ::AN00001010);
+                this->auts_.push_back(AutomorphismZZ::A1000N000N);
+                return this->auts_;
+            }
+        }
+        else if (border(*this, 14))
+        {
+            if (border(*this, 13))
+            {
+                this->numAuts_ = 8;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::ANNN001010);
+                this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                this->auts_.push_back(AutomorphismZZ::A1110N000N);
+                return this->auts_;
+            }
+            else
+            {
+                this->numAuts_ = 8;
+                this->auts_.push_back(AutomorphismZZ::A100010001);
+                this->auts_.push_back(AutomorphismZZ::ANNN001010);
+                this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+                this->auts_.push_back(AutomorphismZZ::A1110N000N);
+                return this->auts_;
+            }
+        }
+        else if (border(*this, 15))
+        {
+            this->numAuts_ = 16;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::AN00N01N10);
+            this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+            this->auts_.push_back(AutomorphismZZ::A0N10N01N0);
+            this->auts_.push_back(AutomorphismZZ::A0N1001N01);
+            this->auts_.push_back(AutomorphismZZ::A01NN10010);
+            this->auts_.push_back(AutomorphismZZ::A01N10N00N);
+            this->auts_.push_back(AutomorphismZZ::A1001N010N);
+            return this->auts_;
+        }
+        else
+        {
+            this->numAuts_ = 4;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::AN0000N0N0);
+            return this->auts_;
+        }
+    }
+    
+    if (border(*this, 10))
+    {
+        if (border(*this, 11) && border(*this, 12))
+        {
+            this->numAuts_ = 8;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::AN000N0001);
+            this->auts_.push_back(AutomorphismZZ::AN0001000N);
+            this->auts_.push_back(AutomorphismZZ::A1000N000N);
+            return this->auts_;
+        }
+        else
+        {
+            this->numAuts_ = 4;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::AN000N0001);
+            return this->auts_;
+        }
+    }
+    
+    if (border(*this, 11))
+    {
+        this->numAuts_ = 4;
+        this->auts_.push_back(AutomorphismZZ::A100010001);
+        this->auts_.push_back(AutomorphismZZ::AN0001000N);
+        return this->auts_;
+    }
+    
+    if (border(*this, 12))
+    {
+        this->numAuts_ = 4;
+        this->auts_.push_back(AutomorphismZZ::A100010001);
+        this->auts_.push_back(AutomorphismZZ::A1000N000N);
+        return this->auts_;
+    }
+    
+    if (border(*this, 13) && border(*this, 14))
+    {
+        this->numAuts_ = 4;
+        this->auts_.push_back(AutomorphismZZ::A100010001);
+        this->auts_.push_back(AutomorphismZZ::A1110N000N);
+        return this->auts_;
+    }
+    
+    if (border(*this, 14))
+    {
+        this->numAuts_ = 4;
+        this->auts_.push_back(AutomorphismZZ::A100010001);
+        this->auts_.push_back(AutomorphismZZ::A1110N000N);
+        return this->auts_;
+    }
+    
+    if (border(*this, 15))
+    {
+        if (border(*this, 16))
+        {
+            this->numAuts_ = 8;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::AN00N01N10);
+            this->auts_.push_back(AutomorphismZZ::A0N10N01N0);
+            this->auts_.push_back(AutomorphismZZ::A01N10N00N);
+            return this->auts_;
+        }
+        else
+        {
+            this->numAuts_ = 4;
+            this->auts_.push_back(AutomorphismZZ::A100010001);
+            this->auts_.push_back(AutomorphismZZ::A01N10N00N);
+            return this->auts_;
+        }
+    }
+    
+    this->numAuts_ = 2;
+    this->auts_.push_back(AutomorphismZZ::A100010001);
+    return this->auts_;
+}

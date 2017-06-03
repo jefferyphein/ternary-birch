@@ -35,6 +35,9 @@ friend class NeighborIterator<R,F>;
 
 public:
     Isometry(bool id = false);
+    Isometry(F a11, F a12, F a13,
+             F a21, F a22, F a23,
+             F a31, F a32, F a33);
 
     void print(std::ostream& os) const;
 
@@ -44,13 +47,18 @@ public:
     bool is_isometry(const QuadForm<R,F>& q,
                      const R& a, const R& b, const R& c,
                      const R& f, const R& g, const R& h) const;
-
     bool is_isometry(const QuadForm<R,F>& from, const QuadForm<R,F>& to) const;
+
+    bool is_automorphism(const QuadForm<R,F>& q) const;
 
     void multiply_on_right_by(std::shared_ptr<Isometry<R,F>> s);
     void multiply_on_left_by(std::shared_ptr<Isometry<R,F>> s);
 
+    F spinor_norm(const QuadForm<R,F>& q) const;
+    F trace(void) const;
+
     std::shared_ptr<Isometry<R,F>> inverse(void) const;
+
 private:
     F a11, a12, a13, a21, a22, a23, a31, a32, a33;
 };
@@ -65,6 +73,14 @@ Isometry<R,F>::Isometry(bool id)
         this->a33 = F(1);
     }
 }
+
+template<typename R, typename F>
+Isometry<R,F>::Isometry(F a11, F a12, F a13,
+                        F a21, F a22, F a23,
+                        F a31, F a32, F a33) :
+    a11(a11), a12(a12), a13(a13),
+    a21(a21), a22(a22), a23(a23),
+    a31(a31), a32(a32), a33(a33) {}
 
 template<typename R, typename F>
 std::ostream& operator<<(std::ostream& os, const Isometry<R,F>& s)
@@ -174,6 +190,12 @@ bool Isometry<R,F>::is_isometry(const QuadForm<R,F>& q,
 }
 
 template<typename R, typename F>
+bool Isometry<R,F>::is_automorphism(const QuadForm<R,F>& q) const
+{
+    return this->is_isometry(q, q);
+}
+
+template<typename R, typename F>
 bool Isometry<R,F>::is_isometry(const QuadForm<R,F>& from, const QuadForm<R,F>& to) const
 {
     return this->is_isometry(from, to.a(), to.b(), to.c(), to.f(), to.g(), to.h());
@@ -252,6 +274,12 @@ std::shared_ptr<Isometry<R,F>> Isometry<R,F>::inverse(void) const
     inv->a33 = a11 * a22 - a12 * a21;
 
     return inv;
+}
+
+template<typename R, typename F>
+F Isometry<R,F>::trace(void) const
+{
+    return this->a11 + this->a22 + this->a33;
 }
 
 #endif // __ISOMETRY_H_

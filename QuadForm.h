@@ -7,10 +7,16 @@
 #include "Isometry.h"
 #include "Prime.h"
 
+// Forward declaration.
+template<typename R, typename F>
+class Isometry;
+
 template<typename R, typename F>
 class QuadForm
 {
 public:
+    typedef std::shared_ptr<Isometry<R,F>> IsometryPtr;
+
     QuadForm(const QuadForm<R,F>&) = default;
 
     QuadForm(const R& a, const R& b, const R& c,
@@ -25,14 +31,20 @@ public:
     const R& f(void) const;
     const R& g(void) const;
     const R& h(void) const;
-    const R& discriminant() const;
+    const R& discriminant(void) const;
 
-    std::shared_ptr<Isometry<R,F>> isometry() const;
-    void isometry(std::shared_ptr<Isometry<R,F>> s);
+    IsometryPtr isometry(void) const;
+    void isometry(IsometryPtr s);
+
+    const std::vector<IsometryPtr>& automorphisms(void);
+    int64_t num_automorphisms(void);
 
     R evaluate(const R& x, const R& y, const R& z) const;
     R evaluate(const std::vector<R>& vec) const;
 
+    int64_t hash_value(void) const;
+    bool operator==(const QuadForm<R,F>& q) const;
+    bool operator<(const QuadForm<R,F>& q) const;
 
     void print(std::ostream& os) const;
 
@@ -56,6 +68,12 @@ private:
 
     /* Flag indicating whether this is a reduced form or not. */
     bool reduced_ = false;
+
+    /* The vector of automorphisms. */
+    std::vector<IsometryPtr> auts_;
+
+    /* The number of automorphism. */
+    int64_t numAuts_ = 0;
 };
 
 /* Generic template implementation follows.
@@ -174,21 +192,39 @@ void QuadForm<R,F>::print(std::ostream& os) const
 }
 
 template<typename R, typename F>
-bool operator<(const QuadForm<R,F>& q1, const QuadForm<R,F>& q2)
+bool QuadForm<R,F>::operator<(const QuadForm<R,F>& q) const
 {
-    if (q1.a() < q2.a()) { return true; }
-    else if (q1.a() > q2.a()) { return false; }
-    else if (q1.b() < q2.b()) { return true; }
-    else if (q1.b() > q2.b()) { return false; }
-    else if (q1.c() < q2.c()) { return true; }
-    else if (q1.c() > q2.c()) { return false; }
-    else if (q1.f() < q2.f()) { return true; }
-    else if (q1.f() > q2.f()) { return false; }
-    else if (q1.g() < q2.g()) { return true; }
-    else if (q1.g() > q2.g()) { return false; }
-    else if (q1.h() < q2.h()) { return true; }
-    else if (q1.h() > q2.g()) { return false; }
+    if (this->a_ < q.a()) { return true; }
+    else if (this->a_ > q.a()) { return false; }
+    else if (this->b_ < q.b()) { return true; }
+    else if (this->b_ > q.b()) { return false; }
+    else if (this->c_ < q.c()) { return true; }
+    else if (this->c_ > q.c()) { return false; }
+    else if (this->f_ < q.f()) { return true; }
+    else if (this->f_ > q.f()) { return false; }
+    else if (this->g_ < q.g()) { return true; }
+    else if (this->g_ > q.g()) { return false; }
+    else if (this->h_ < q.h()) { return true; }
+    else if (this->h_ > q.g()) { return false; }
     else { return false; }
+}
+
+template<typename R, typename F>
+bool QuadForm<R,F>::operator==(const QuadForm<R,F>& q) const
+{
+    return (this->a_ == q.a() &&
+            this->b_ == q.b() &&
+            this->c_ == q.c() &&
+            this->f_ == q.f() &&
+            this->g_ == q.g() &&
+            this->h_ == q.h());
+}
+
+template<typename R, typename F>
+int64_t QuadForm<R,F>::num_automorphisms(void)
+{
+    this->automorphisms();
+    return this->numAuts_;
 }
 
 #endif // __QUAD_FORM_H_

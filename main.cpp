@@ -45,6 +45,6 @@ int main(int argc, char** argv)
 
     GenusZZ genus(q);
     genus.print();
-    
+
     return EXIT_SUCCESS;
 }

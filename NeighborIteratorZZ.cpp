@@ -330,7 +330,9 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
     f *= p;
     h /= p;
 
+#ifdef DEBUG
     assert( s->is_isometry(*this->q_, a, b, c, f, g, h) );
+#endif
 
     //s->multiply_on_left_by(this->q_->isometry());
 
