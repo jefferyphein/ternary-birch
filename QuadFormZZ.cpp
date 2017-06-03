@@ -1,14 +1,12 @@
 #include <gmpxx.h>
 #include <cassert>
 #include "QuadForm.h"
-#include "Prime.h"
 #include "Math.h"
 #include "AutomorphismZZ.h"
 
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
 typedef Isometry<mpz_class, mpq_class> IsometryQQ;
 typedef std::shared_ptr<IsometryQQ> IsometryQQPtr;
-typedef Prime<mpz_class, mpq_class> PrimeZZ;
 
 template<>
 std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
@@ -432,11 +430,8 @@ printf("t\n");
 }
 
 template<>
-std::vector<mpz_class> QuadFormZZ::isotropic_vector(std::shared_ptr<PrimeZZ> pR) const
+std::vector<mpz_class> QuadFormZZ::isotropic_vector(const mpz_class& p) const
 {
-    // The prime integer.
-    mpz_class p = abs(pR->principal_generator());
-
     std::vector<mpz_class> vec(3, 0);
 
     if (Math::gcd(this->disc_, p) != 1)

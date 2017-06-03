@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <gmpxx.h>
 #include "Isometry.h"
-#include "Prime.h"
 
 // Forward declaration.
 template<typename R, typename F>
@@ -48,7 +47,7 @@ public:
 
     void print(std::ostream& os) const;
 
-    std::vector<R> isotropic_vector(std::shared_ptr<Prime<R,F>> pR) const;
+    std::vector<R> isotropic_vector(const R& p) const;
 
     static std::shared_ptr<QuadForm<R,F>> reduce(const QuadForm<R,F>& q,
                                                  bool saveIsometry = true);

@@ -1,5 +1,5 @@
 #ifndef __GENUS_H_
-#define __GENUS_H
+#define __GENUS_H_
 
 #include <memory>
 #include <iomanip>
@@ -7,9 +7,8 @@
 #include <unordered_set>
 #include <set>
 #include "QuadForm.h"
-#include "Prime.h"
 #include "NeighborIterator.h"
-#include "Representation.h"
+#include "Character.h"
 
 template<typename R, typename F>
 class GenusRep
@@ -40,7 +39,9 @@ public:
 
     QuadFormPtr quad_form(void) const;
 
-    std::shared_ptr<Prime<R,F>> smallest_good_prime(void) const;
+    R smallest_good_prime(void) const;
+
+    void add_character(const Character<R,F>& chi);
 
     void print(void) const;
 
@@ -65,8 +66,8 @@ private:
     /* Flag indicating whether the genus has been computed in full. */
     bool computed_ = false;
 
-    /* A set of representations to compute. */
-    std::set<Representation<R,F>> reprSet_;
+    /* A set of characters to compute. */
+    std::set<Character<R,F>> reprSet_;
 };
 
 template<typename R, typename F>
@@ -151,7 +152,7 @@ void Genus<R,F>::compute_genus(void)
     this->genusVec_.push_back(this->q_);
 
     // Determine the smallest good prime.
-    std::shared_ptr<Prime<R,F>> p = this->smallest_good_prime();
+    R p = this->smallest_good_prime();
 
     // Loop over all genus representatives as the genus is built.
     int64_t index = 0;
@@ -185,6 +186,15 @@ void Genus<R,F>::compute_genus(void)
             // Get the next p-neighbor.
             pn = it.next_neighbor();
         }
+    }
+}
+
+template<typename R, typename F>
+void Genus<R,F>::add_character(const Character<R,F>& repr)
+{
+    if (this->reprSet_.count(repr) == 0)
+    {
+        this->reprSet_.insert(repr);
     }
 }
 

@@ -8,24 +8,20 @@
 
 typedef NeighborIterator<mpz_class, mpq_class> NeighborIteratorZZ;
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
-typedef Prime<mpz_class, mpq_class> PrimeZZ;
 typedef ChangeOfBasis<mpz_class, mpq_class> ChangeOfBasisZZ;
 typedef Isometry<mpz_class, mpq_class> IsometryQQ;
 
 template<>
-NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, std::shared_ptr<PrimeZZ> pR) :
+NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_class& p) :
     q_(q),
-    p_(pR),
-    numNeighbors_(mpz_class(pR->norm() + 1)),
+    p_(abs(p)),
+    numNeighbors_(abs(p) + 1),
     pos_(mpz_class(0)),
-    isotropicVector_(q->isotropic_vector(pR)),
-    s_(std::make_shared<ChangeOfBasisZZ>(pR))
+    isotropicVector_(q->isotropic_vector(p)),
+    s_(std::make_shared<ChangeOfBasisZZ>(p))
 {
-    // The prime integer.
-    mpz_class p = pR->principal_generator();
-
     // Normalize the initial isotropic vector.
-    Math::normalize_vector(this->isotropicVector_, p);
+    Math::normalize_vector(this->isotropicVector_, this->p_);
 
     /* Our goal at this point is to build a p-standard basis which can then
      * be utilized to help us construct all of the p-neighbors of the attached
@@ -108,7 +104,9 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, std::shared_
         g.swap(h);
     }
 
+#ifdef DEBUG
     assert( (g % p) != 0 );
+#endif
 
     // Scalar to make (h % p) == 0.
     mpz_class scalar = (-h * Math::modinv(g, p)) % p;
@@ -124,7 +122,9 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, std::shared_
     f = (f + 2 * c * scalar) % p;
     h = (h + scalar * g) % p;
 
+#ifdef DEBUG
     assert( h == 0 );
+#endif
 
     // Multiply the isometry on the right by...
     // |  1  0  0 |
@@ -156,7 +156,7 @@ template<>
 std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_class>& vec)
 {
     // The prime integer.
-    mpz_class p = this->p_->principal_generator();
+    mpz_class p = this->p_;
 
     // Normalize the isotropic vector modulo p, then adjust its coefficients
     // so that their absolute value is as small as possible.
@@ -284,7 +284,9 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
     f += 2 * c * scalar;
     h += scalar * g;
 
+#ifdef DEBUG
     assert( h % p == 0 );
+#endif
 
     // Avoid recomputing p*p repeatedly.
     mpz_class pp = p*p;
@@ -311,7 +313,9 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
     g += (2 * c * scalar);
     h += (scalar * f);
 
+#ifdef DEBUG
     assert( a % pp == 0 );
+#endif
 
     // Multiply on the right by...
     // | 1/p  0   0 |
@@ -349,7 +353,7 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::next_neighbor(void)
     // Return nullptr if no more neighbors to compute.
     if (this->pos_ >= this->numNeighbors_) { return nullptr; }
 
-    mpz_class p = this->p_->principal_generator();
+    mpz_class p = this->p_;
 
     // Make a copy of the initial isotropic vector.
     std::vector<mpz_class> vec(this->isotropicVector_);
@@ -371,7 +375,9 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::next_neighbor(void)
         vec[2] = this->s_->a33;
     }
 
+#ifdef DEBUG
     assert( this->q_->evaluate(vec) % p == 0 );
+#endif
 
     auto qq = this->build_neighbor(vec);
 

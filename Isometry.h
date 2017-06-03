@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include "QuadForm.h"
-#include "Prime.h"
 
 /* Forward declaration for friend class. */
 template<typename R, typename F>
@@ -17,12 +16,12 @@ class ChangeOfBasis
 {
 friend class NeighborIterator<R,F>;
 public:
-    ChangeOfBasis(std::shared_ptr<Prime<R,F>> pR) : pR_(pR) {}
+    ChangeOfBasis(const R& p) : p_(p) {}
 
     void print(std::ostream& os) const;
 
 private:
-    std::shared_ptr<Prime<R,F>> pR_;
+    R p_;
     R a11, a12, a13, a21, a22, a23, a31, a32, a33;
 };
 

@@ -7,12 +7,11 @@
 srcs = Split('''
     main.cpp
     AutomorphismZZ.cpp
+    CharacterZZ.cpp
     GenusZZ.cpp
-    IdealZZ.cpp
     IsometryZZ.cpp
     NeighborIteratorZZ.cpp
     QuadFormZZ.cpp
-    RepresentationZZ.cpp
 ''')
 
 libs = Split('''

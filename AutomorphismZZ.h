@@ -1,5 +1,5 @@
-#ifndef __AUTOMORPHISM_ZZ_H
-#define __AUTOMORPHISM_ZZ_H
+#ifndef __AUTOMORPHISM_ZZ_H_
+#define __AUTOMORPHISM_ZZ_H_
 
 #include <memory>
 #include "Isometry.h"
@@ -111,4 +111,4 @@ public:
     static IsometryQQPtr A11100NN00;
 };
 
-#endif /* AUTOMORPHISM_ZZ_H */
+#endif /* AUTOMORPHISM_ZZ_H_ */

@@ -3,13 +3,12 @@
 
 #include <memory>
 #include "QuadForm.h"
-#include "Prime.h"
 
 template<typename R, typename F>
 class NeighborIterator
 {
 public:
-    NeighborIterator(std::shared_ptr<QuadForm<R,F>> q, std::shared_ptr<Prime<R,F>> pR);
+    NeighborIterator(std::shared_ptr<QuadForm<R,F>> q, const R& p);
 
     inline mpz_class num_neighbors(void) const;
 
@@ -19,7 +18,7 @@ private:
     std::shared_ptr<QuadForm<R,F>> build_neighbor(std::vector<R>& vec);
 
     std::shared_ptr<QuadForm<R,F>> q_;
-    std::shared_ptr<Prime<R,F>> p_;
+    R p_;
     mpz_class numNeighbors_;
 
     mpz_class pos_;
