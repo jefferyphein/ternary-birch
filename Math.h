@@ -144,6 +144,67 @@ public:
         while (den % p == 0) { --count; den /= p; }
         return count;
     }
+
+    static std::vector<mpz_class> prime_divisors_naive(mpz_class n)
+    {
+        std::vector<mpz_class> ps;
+
+        while (n % 2 == 0)
+        {
+            ps.push_back(2);
+            do
+            {
+                n /= 2;
+            }
+            while (n % 2 == 0);
+        }
+
+        mpz_class upper = sqrt(n);
+        for (mpz_class p = 3; p <= upper; p += 2)
+        {
+            if (n % p == 0)
+            {
+                ps.push_back(p);
+                do
+                {
+                    n /= p;
+                }
+                while (n % p == 0);
+            }
+            upper = sqrt(n);
+        }
+
+        if (n != 1)
+        {
+            ps.push_back(n);
+        }
+
+        return ps;
+    }
+
+    static std::vector<mpz_class> prime_divisors(mpz_class n)
+    {
+        return Math::prime_divisors_naive(n);
+    }
+
+    static std::vector<std::vector<mpz_class>> squarefree_divisors(mpz_class n)
+    {
+        std::vector<mpz_class> ps = Math::prime_divisors(n);
+        std::vector<std::vector<mpz_class>> divs(1, std::vector<mpz_class>());
+
+        for (auto& p : ps)
+        {
+            size_t m = divs.size();
+            for (size_t k = 0; k < m; k++)
+            {
+                auto vec = divs[k];
+                vec.push_back(p);
+                divs.push_back(vec);
+            }
+        }
+
+        return divs;
+    }
 };
 
 #endif // __MATH_H_

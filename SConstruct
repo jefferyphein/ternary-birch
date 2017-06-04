@@ -18,6 +18,7 @@ libs = Split('''
     gmpxx
     gmp
     m
+    pthread
 ''')
 
 libpath = Split('''

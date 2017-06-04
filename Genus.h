@@ -7,6 +7,10 @@
 #include <unordered_set>
 #include <set>
 #include <map>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <chrono>
 #include "QuadForm.h"
 #include "NeighborIterator.h"
 #include "Character.h"
@@ -40,7 +44,7 @@ class Genus
 public:
     typedef std::shared_ptr<QuadForm<R,F>> QuadFormPtr;
 
-    Genus(const QuadForm<R,F>& q);
+    Genus(const QuadForm<R,F>& q, int64_t numThreads=0);
 
     QuadFormPtr quad_form(void) const;
 
@@ -62,11 +66,28 @@ public:
     void compute_genus(void);
 
 private:
+    /* The number of threads to use. */
+    int64_t numThreads_;
+
+    /* This function is passed to threads, pulls a genus representative off of
+     * a queue, then computes its p-neighbors. */
+    void threaded_compute_genus(const R& p, int64_t threadid);
+
+    /* A vector of booleans used to determine whether a thread is blocked due
+     * to there being no objects in the genusQueue_. */
+    std::vector<bool> threadBlocked_;
+
     /* An unordered set which stores distinct genus representatives. */
     std::unordered_set<GenusRep<R,F>> genusReps_;
 
     /* A vector of shared QuadForm pointers. An unordered list of the genus. */
     std::vector<QuadFormPtr> genusVec_;
+
+    /* A queue of shared QuadForm pointers used for multithreading. */
+    std::queue<QuadFormPtr> genusQueue_;
+
+    /* A mutex used for multithreading. */
+    std::mutex genusMutex_;
 
     /* A pointer to the originating form. */
     QuadFormPtr q_;
@@ -149,10 +170,11 @@ namespace std
 }
 
 template<typename R, typename F>
-Genus<R,F>::Genus(const QuadForm<R,F>& q)
+Genus<R,F>::Genus(const QuadForm<R,F>& q, int64_t numThreads)
 {
     this->q_ = QuadForm<R,F>::reduce(q, false);
     this->disc_ = this->q_->discriminant();
+    this->numThreads_ = numThreads;
 }
 
 template<typename R, typename F>
@@ -168,6 +190,87 @@ size_t Genus<R,F>::size(void) const
 }
 
 template<typename R, typename F>
+void Genus<R,F>::threaded_compute_genus(const R& p, int64_t threadid)
+{
+    do
+    {
+        // Obtain the mutex.
+        this->genusMutex_.lock();
+
+        // Once the lock is obtained, indicate that the thread is not blocked.
+        // This will ensure that other threads will not terminate if they
+        // obtain the lock.
+        this->threadBlocked_[threadid] = false;
+
+        // Check the size of the queue to determine whether we are blocked.
+        if (this->genusQueue_.size() == 0)
+        {
+            // If there is nothing in the queue, we're blocked.
+            this->threadBlocked_[threadid] = true;
+
+            // Determine whether all threads are blocked.
+            bool done = true;
+            for (bool value : this->threadBlocked_)
+            {
+                done = done && value;
+            }
+
+            // If all threads are blocked, release the lock and terminate.
+            if (done) 
+            {
+                this->genusMutex_.unlock();
+                return;
+            }
+
+            // Release the lock and sleep for a random number of milliseconds.
+            this->genusMutex_.unlock();
+            std::default_random_engine dre(threadid);
+            std::uniform_int_distribution<int64_t> id(0, 20);
+            std::this_thread::sleep_for(std::chrono::milliseconds(id(dre)));
+            continue;
+        }
+        else
+        {
+            // Pop the next genus representative off the queue, and unlock the
+            // mutex.
+            QuadFormPtr cur = this->genusQueue_.front();
+            this->genusQueue_.pop();
+            this->genusMutex_.unlock();
+
+            // The neighbor iterator.
+            NeighborIterator<R,F> it(cur, p);
+
+            // The first neighbor.
+            QuadFormPtr pn = it.next_neighbor();
+#ifdef DEBUG
+            assert( pn->isometry()->is_isometry(*this->q_, *pn) );
+#endif
+
+            // Loop over all p-neighbors.
+            while (pn != nullptr)
+            {
+#ifdef DEBUG
+                assert( pn->isometry()->is_isometry(*this->q_, *pn) );
+#endif
+
+                // Reduce the p-neighbor.
+                QuadFormPtr qq = QuadForm<R,F>::reduce(*pn);
+
+                // Obtain the lock, add this genus representative to the queue
+                // and release the lock.
+                this->genusMutex_.lock();
+                this->add_genus_rep(qq, pn);
+                this->genusMutex_.unlock();
+
+                // Get the next p-neighbor.
+                pn = it.next_neighbor();
+            }
+        }
+    }
+    while (true);
+}
+
+template<typename R, typename F>
 void Genus<R,F>::compute_genus(void)
 {
     // Do nothing if the genus has already been computed.
@@ -179,38 +282,64 @@ void Genus<R,F>::compute_genus(void)
     // Determine the smallest good prime.
     R p = this->smallest_good_prime();
 
-    // Loop over all genus representatives as the genus is built.
-    int64_t index = 0;
-    while (index < this->genusVec_.size())
+    // Should we use threads?
+    if (this->numThreads_ > 0)
     {
-        // The current genus representative.
-        QuadFormPtr cur = this->genusVec_[index++];
+        // Initialize a vector of booleans initialized to false. Each thread
+        // will modify this vector to indicate that it is blocked on the
+        // queue. Once all threads have indicated that they are blocked, each
+        // thread will terminate execution.
+        this->threadBlocked_ = std::vector<bool>(this->numThreads_, false);
 
-        // The neighbor iterator.
-        NeighborIterator<R,F> it(cur, p);
-
-        // The first neighbor.
-        QuadFormPtr pn = it.next_neighbor();
-
-#ifdef DEBUG
-        assert( pn->isometry()->is_isometry(*this->q_, *pn) );
-#endif
-
-        // Loop over all p-neighbors.
-        while (pn != nullptr)
+        // Build the threads.
+        std::vector<std::thread> threads;
+        for (int64_t n = 0; n < this->numThreads_; n++)
         {
+            threads.push_back(std::thread(&Genus<R,F>::threaded_compute_genus, this, p, n));
+            this->threadBlocked_[n] = false;
+        }
+
+        // Wait for all threads to terminate.
+        for (auto& t : threads)
+        {
+            t.join();
+        }
+    }
+    else
+    {
+        // Loop over all genus representatives as the genus is built.
+        int64_t index = 0;
+        while (index < this->genusVec_.size())
+        {
+            // The current genus representative.
+            QuadFormPtr cur = this->genusVec_[index++];
+    
+            // The neighbor iterator.
+            NeighborIterator<R,F> it(cur, p);
+    
+            // The first neighbor.
+            QuadFormPtr pn = it.next_neighbor();
+    
 #ifdef DEBUG
             assert( pn->isometry()->is_isometry(*this->q_, *pn) );
 #endif
-
-            // Reduce the p-neighbor.
-            QuadFormPtr qq = QuadForm<R,F>::reduce(*pn);
-
-            // Add this reduce form to the genus, if necessary.
-            this->add_genus_rep(qq, pn);
-
-            // Get the next p-neighbor.
-            pn = it.next_neighbor();
+    
+            // Loop over all p-neighbors.
+            while (pn != nullptr)
+            {
+#ifdef DEBUG
+                assert( pn->isometry()->is_isometry(*this->q_, *pn) );
+#endif
+    
+                // Reduce the p-neighbor.
+                QuadFormPtr qq = QuadForm<R,F>::reduce(*pn);
+    
+                // Add this reduce form to the genus, if necessary.
+                this->add_genus_rep(qq, pn);
+    
+                // Get the next p-neighbor.
+                pn = it.next_neighbor();
+            }
         }
     }
 }
@@ -241,6 +370,7 @@ void Genus<R,F>::add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor)
         // Update data structures.
         this->genusReps_.insert(rep);
         this->genusVec_.push_back(q);
+        this->genusQueue_.push(q);
     }
 }
 
