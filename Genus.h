@@ -14,18 +14,25 @@
 #include "QuadForm.h"
 #include "NeighborIterator.h"
 #include "Character.h"
+#include "HeckeOperator.h"
+
+//#define DEBUG
 
 template<typename R, typename F>
 class GenusRep
 {
 public:
     typedef std::shared_ptr<QuadForm<R,F>> QuadFormPtr;
+    typedef std::shared_ptr<Isometry<R,F>> IsometryPtr;
 
     GenusRep(QuadFormPtr qPtr);
 
-    int64_t pos(void) const;
-    void pos(int64_t x);
+    const mpz_class& pos(const Character<R,F>& chi) const;
+    void set_position(const Character<R,F>& chi, const mpz_class& x);
+    const mpz_class& position(const Character<R,F>& chi) const;
+    void set_inverse(void);
     QuadFormPtr quad_form(void) const;
+    IsometryPtr inverse(void) const;
 
     void set_dimension(const Character<R,F>& chi, const mpz_class& dim);
     mpz_class dimension(const Character<R,F>& chi) const;
@@ -34,8 +41,9 @@ public:
     bool operator<(const GenusRep<R,F>& rep) const;
 private:
     QuadFormPtr q_;
-    int64_t pos_ = -1;
-    std::map<Character<R,F>, mpz_class> dimensionMap_;
+    IsometryPtr inv_;
+    std::map<R, mpz_class> positionMap_;
+    std::map<R, mpz_class> dimensionMap_;
 };
 
 template<typename R, typename F>
@@ -43,15 +51,15 @@ class Genus
 {
 public:
     typedef std::shared_ptr<QuadForm<R,F>> QuadFormPtr;
+    typedef std::shared_ptr<HeckeOperator<R,F>> HeckePtr;
 
-    Genus(const QuadForm<R,F>& q, int64_t numThreads=0);
+    Genus(const QuadForm<R,F>& q);
 
     QuadFormPtr quad_form(void) const;
 
     R smallest_good_prime(void) const;
 
     void add_character(const Character<R,F>& chi);
-    void add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor=nullptr);
 
     void set_dimensions(GenusRep<R,F>& rep);
 
@@ -61,33 +69,16 @@ public:
 
     mpz_class dimension(const Character<R,F>& chi) const;
 
+    void compute_hecke_operators(const R& p, int64_t numThreads=0);
+
+    HeckePtr hecke_operator(const R& p, const Character<R,F>& chi);
+
     /* Computes the full genus. */
     // TODO: MAKE THIS PRIVATE. THIS IS PUBLIC FOR TESTING PURPSOES ONLY.
-    void compute_genus(void);
+    void compute_genus(int64_t numThreads=0);
 
 private:
-    /* The number of threads to use. */
-    int64_t numThreads_;
-
-    /* This function is passed to threads, pulls a genus representative off of
-     * a queue, then computes its p-neighbors. */
-    void threaded_compute_genus(const R& p, int64_t threadid);
-
-    /* A vector of booleans used to determine whether a thread is blocked due
-     * to there being no objects in the genusQueue_. */
-    std::vector<bool> threadBlocked_;
-
-    /* An unordered set which stores distinct genus representatives. */
-    std::unordered_set<GenusRep<R,F>> genusReps_;
-
-    /* A vector of shared QuadForm pointers. An unordered list of the genus. */
-    std::vector<QuadFormPtr> genusVec_;
-
-    /* A queue of shared QuadForm pointers used for multithreading. */
-    std::queue<QuadFormPtr> genusQueue_;
-
-    /* A mutex used for multithreading. */
-    std::mutex genusMutex_;
+    ////////// GENERAL MEMBER VARIABLES
 
     /* A pointer to the originating form. */
     QuadFormPtr q_;
@@ -98,6 +89,49 @@ private:
     /* Flag indicating whether the genus has been computed in full. */
     bool computed_ = false;
 
+    /* Character dimensions. */
+    std::map<R, mpz_class> dimensionMap_;
+
+    /* Attempts to add a new genus representative. */
+    void add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor=nullptr);
+
+    /* Finds a genus representative. Will throw an exception if not found. */
+    const GenusRep<R,F>& find_genus_rep(QuadFormPtr q) const;
+
+    ////////// THREADING RESOURCES
+
+    /* This function is passed to threads, pulls a genus representative off of
+     * a queue and computes its p-neighbors. */
+    void threaded_compute_genus(const R& p, int64_t threadid);
+
+    /* This function is passed to threads, pulls a genus representative out of
+     * a vector based on the value of genusVecIndex_. */
+    void threaded_compute_hecke_operators(const R& p, int64_t threadid);
+
+    /* A vector of booleans used to determine whether a thread is blocked due
+     * to there being no objects in the genusQueue_. */
+    std::vector<bool> threadBlocked_;
+
+    /* A queue of shared QuadForm pointers used for multithreading. */
+    std::queue<QuadFormPtr> genusQueue_;
+
+    /* An index used to access GenusReps when computing Hecke operators. */
+    int64_t genusVecIndex_;
+
+    /* A mutex used for accessing genus reps when multithreading. */
+    std::mutex genusMutex_;
+
+    /* A mutex used for updating Hecke operator values when multithreading. */
+    std::mutex heckeMutex_;
+
+    ////////// GENUS DATA STRUCTURES
+
+    /* An unordered set which stores distinct genus representatives. */
+    std::unordered_set<GenusRep<R,F>> genusReps_;
+
+    /* A vector of shared QuadForm pointers. An unordered list of the genus. */
+    std::vector<QuadFormPtr> genusVec_;
+
     /* A set of characters to compute. */
     std::set<Character<R,F>> charSet_;
 
@@ -106,24 +140,42 @@ private:
      * computed and then multiplied together to obtain the desired
      * representation value. */
     std::set<Character<R,F>> primeCharSet_;
+
+    ////////// HECKE OPERATOR RESOURCES
+
+    /* A map structure used to organize Hecke operators. */
+    std::map<R, std::map<R, HeckePtr>> heckeMap_;
+
+    /* A helper function that updates Hecke operators. */
+    void update_hecke_operators(const R& p,
+                                const GenusRep<R,F>& rep,
+                                QuadFormPtr neighbor,
+                                std::map<mpz_class, HeckePtr>& hecke);
 };
 
 template<typename R, typename F>
 GenusRep<R,F>::GenusRep(QuadFormPtr q)
 {
     this->q_ = q;
+    this->inv_ = nullptr;
 }
 
 template<typename R, typename F>
-int64_t GenusRep<R,F>::pos(void) const
+void GenusRep<R,F>::set_inverse(void)
 {
-    return this->pos_;
+    this->inv_ = this->q_->isometry()->inverse();
 }
 
 template<typename R, typename F>
-void GenusRep<R,F>::pos(int64_t x)
+void GenusRep<R,F>::set_position(const Character<R,F>& chi, const mpz_class& x)
 {
-    this->pos_ = x;
+    this->positionMap_[chi.conductor()] = x;
+}
+
+template<typename R, typename F>
+const mpz_class& GenusRep<R,F>::position(const Character<R,F>& chi) const
+{
+    return this->positionMap_.find(chi.conductor())->second;
 }
 
 template<typename R, typename F>
@@ -139,6 +191,12 @@ bool GenusRep<R,F>::operator==(const GenusRep<R,F>& rep) const
 }
 
 template<typename R, typename F>
+std::shared_ptr<Isometry<R,F>> GenusRep<R,F>::inverse(void) const
+{
+    return this->inv_;
+}
+
+template<typename R, typename F>
 bool GenusRep<R,F>::operator<(const GenusRep<R,F>& rep) const
 {
     return *this->q_ < *(rep.quad_form());
@@ -147,9 +205,9 @@ bool GenusRep<R,F>::operator<(const GenusRep<R,F>& rep) const
 template<typename R, typename F>
 mpz_class GenusRep<R,F>::dimension(const Character<R,F>& chi) const
 {
-    if (this->dimensionMap_.count(chi) > 0)
+    if (this->dimensionMap_.count(chi.conductor()) > 0)
     {
-        return this->dimensionMap_.find(chi)->second;
+        return this->dimensionMap_.find(chi.conductor())->second;
     }
     else
     {
@@ -170,11 +228,10 @@ namespace std
 }
 
 template<typename R, typename F>
-Genus<R,F>::Genus(const QuadForm<R,F>& q, int64_t numThreads)
+Genus<R,F>::Genus(const QuadForm<R,F>& q)
 {
     this->q_ = QuadForm<R,F>::reduce(q, false);
     this->disc_ = this->q_->discriminant();
-    this->numThreads_ = numThreads;
 }
 
 template<typename R, typename F>
@@ -186,21 +243,16 @@ std::shared_ptr<QuadForm<R,F>> Genus<R,F>::quad_form(void) const
 template<typename R, typename F>
 size_t Genus<R,F>::size(void) const
 {
-    return this->genusSet_.size();
+    return this->genusReps_.size();
 }
 
 template<typename R, typename F>
 void Genus<R,F>::threaded_compute_genus(const R& p, int64_t threadid)
 {
-    do
+    while (true)
     {
         // Obtain the mutex.
         this->genusMutex_.lock();
-
-        // Once the lock is obtained, indicate that the thread is not blocked.
-        // This will ensure that other threads will not terminate if they
-        // obtain the lock.
-        this->threadBlocked_[threadid] = false;
 
         // Check the size of the queue to determine whether we are blocked.
         if (this->genusQueue_.size() == 0)
@@ -216,6 +268,8 @@ void Genus<R,F>::threaded_compute_genus(const R& p, int64_t threadid)
             }
 
             // If all threads are blocked, release the lock and terminate.
+            // This can only happen if there are no more elements in the queue
+            // to process.
             if (done) 
             {
                 this->genusMutex_.unlock();
@@ -231,6 +285,10 @@ void Genus<R,F>::threaded_compute_genus(const R& p, int64_t threadid)
         }
         else
         {
+            // Indicate that the thread is not blocked. This will ensure that
+            // other threads will not terminate if they obtain the lock.
+            this->threadBlocked_[threadid] = false;
+
             // Pop the next genus representative off the queue, and unlock the
             // mutex.
             QuadFormPtr cur = this->genusQueue_.front();
@@ -267,14 +325,19 @@ void Genus<R,F>::threaded_compute_genus(const R& p, int64_t threadid)
             }
         }
     }
-    while (true);
 }
 
 template<typename R, typename F>
-void Genus<R,F>::compute_genus(void)
+void Genus<R,F>::compute_genus(int64_t numThreads)
 {
     // Do nothing if the genus has already been computed.
     if (this->computed_) { return; }
+
+    // Initialize the dimensions for each character to zero.
+    for (auto& chi : this->charSet_)
+    {
+        this->dimensionMap_[chi.conductor()] = 0;
+    }
 
     // Add the defining quadratic form as the initial genus rep.
     this->add_genus_rep(this->q_);
@@ -283,19 +346,21 @@ void Genus<R,F>::compute_genus(void)
     R p = this->smallest_good_prime();
 
     // Should we use threads?
-    if (this->numThreads_ > 0)
+    if (numThreads > 0)
     {
-        // Initialize a vector of booleans initialized to false. Each thread
-        // will modify this vector to indicate that it is blocked on the
-        // queue. Once all threads have indicated that they are blocked, each
-        // thread will terminate execution.
-        this->threadBlocked_ = std::vector<bool>(this->numThreads_, false);
+        // Initialize a vector of booleans to false. Each thread will modify
+        // this vector to indicate that it is blocked on the queue. Once all
+        // threads have indicated that they are blocked, each thread will
+        // terminate execution.
+        this->threadBlocked_ = std::vector<bool>(numThreads, false);
 
         // Build the threads.
         std::vector<std::thread> threads;
-        for (int64_t n = 0; n < this->numThreads_; n++)
+        for (int64_t n = 0; n < numThreads; n++)
         {
-            threads.push_back(std::thread(&Genus<R,F>::threaded_compute_genus, this, p, n));
+            threads.push_back(std::thread(
+                &Genus<R,F>::threaded_compute_genus, this, p, n
+            ));
             this->threadBlocked_[n] = false;
         }
 
@@ -345,6 +410,13 @@ void Genus<R,F>::compute_genus(void)
 }
 
 template<typename R, typename F>
+const GenusRep<R,F>& Genus<R,F>::find_genus_rep(QuadFormPtr q) const
+{
+    GenusRep<R,F> rep(q);
+    return *(this->genusReps_.find(rep));
+}
+
+template<typename R, typename F>
 void Genus<R,F>::add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor)
 {
     // Create a GenusRep object from the shared pointer.
@@ -367,6 +439,28 @@ void Genus<R,F>::add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor)
         // Set the dimensions for this genus representative.
         this->set_dimensions(rep);
 
+        for (auto& chi : this->charSet_)
+        {
+            // Update the dimensions for each character.
+            this->dimensionMap_[chi.conductor()] += rep.dimension(chi);
+
+            // Set the relative position for this genus rep with respect to
+            // each character. A position of -1 indicates that this genus rep
+            // does not contribute to the dimension of the space associated to
+            // this character.
+            if (rep.dimension(chi) > 0)
+            {
+                rep.set_position(chi, this->dimensionMap_[chi.conductor()]-1);
+            }
+            else
+            {
+                rep.set_position(chi, -1);
+            }
+        }
+
+        // Set the inverse value of the genus rep.
+        rep.set_inverse();
+
         // Update data structures.
         this->genusReps_.insert(rep);
         this->genusVec_.push_back(q);
@@ -377,7 +471,7 @@ void Genus<R,F>::add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor)
 template<typename R, typename F>
 void GenusRep<R,F>::set_dimension(const Character<R,F>& chi, const mpz_class& dim)
 {
-    this->dimensionMap_[chi] = dim;
+    this->dimensionMap_[chi.conductor()] = dim;
 }
 
 template<typename R, typename F>
@@ -405,24 +499,232 @@ void Genus<R,F>::add_character(const Character<R,F>& chi)
 }
 
 template<typename R, typename F>
+std::shared_ptr<HeckeOperator<R,F>> Genus<R,F>::hecke_operator(const R& p, const Character<R,F>& chi)
+{
+    auto ptr = std::make_shared<HeckeOperator<R,F>>(*this, chi);
+    return ptr;
+}
+
+template<typename R, typename F>
+void Genus<R,F>::update_hecke_operators(const R& ,
+                                        const GenusRep<R,F>& rep,
+                                        QuadFormPtr neighbor,
+                                        std::map<mpz_class, HeckePtr>& hecke)
+{
+#ifdef DEBUG
+    assert( neighbor->isometry()->is_isometry(*this->q_, *neighbor) );
+#endif
+
+    // The reduced form of the p-neighbor.
+    QuadFormPtr qq = QuadForm<R,F>::reduce(*neighbor);
+
+    // The genus rep for this p-neighbor.
+    const GenusRep<R,F>& rrep = this->find_genus_rep(qq);
+
+    // Multiply the p-neighbor isometry on the right by the reduction
+    // isometry. This now represents an isometry from the original
+    // quadratic form to the genus representative isometric to this
+    // p-neighbor.
+    neighbor->isometry()->multiply_on_right_by(qq->isometry());
+
+#ifdef DEBUG
+    assert( neighbor->isometry()->is_isometry(*this->q_, *rrep.quad_form()) );
+#endif
+
+    // Obtain an automorphism of the original quadratic form.
+    neighbor->isometry()->multiply_on_right_by(rrep.inverse());
+
+#ifdef DEBUG
+    assert( neighbor->isometry()->is_automorphism(*this->q_) );
+#endif
+
+    // Convenient reference for the automorphism we'll use.
+    std::shared_ptr<Isometry<R,F>> aut = neighbor->isometry();
+
+    // Compute the value of each primitive character.
+    std::map<R, R> primeValues;
+    for (auto& chi : this->primeCharSet_)
+    {
+        primeValues[chi.conductor()] = chi.rho(*aut, *this->q_);
+    }
+
+    // Build the values of the composite characters from the values of the
+    // primitive characters we just computed.
+    for (auto& chi : this->charSet_)
+    {
+        R value = R(1);
+        auto facs = chi.primes();
+        for (auto& fac : facs)
+        {
+            value *= primeValues[fac];
+        }
+
+        mpz_class row = rep.position(chi);
+        if (row == -1) { continue; }
+
+        mpz_class col = rrep.position(chi);
+        if (col == -1) { continue; }
+
+        hecke[chi.conductor()]->update(row, col, value);
+
+        //this->heckeMutex_.lock();
+        //this->heckeMap_[p][chi.conductor()]->update(row, col, value);
+        //this->heckeMutex_.unlock();
+    }
+}
+
+template<typename R, typename F>
+void Genus<R,F>::threaded_compute_hecke_operators(const R& p, int64_t)
+{
+    while (true)
+    {
+        this->genusMutex_.lock();
+
+        // Have we reached the end of the genus vector?
+        if (this->genusVecIndex_ >= this->genusVec_.size())
+        {
+            // If so, release the lock and return.
+            this->genusMutex_.unlock();
+            return;
+        }
+
+        // Obtain a genus representative form to process and release the lock.
+        QuadFormPtr cur = this->genusVec_[this->genusVecIndex_++];
+        this->genusMutex_.unlock();
+
+        // The current genus representative object.
+        const GenusRep<R,F>& rep = this->find_genus_rep(cur);
+
+        // The neighbor iterator.
+        NeighborIterator<R,F> it(cur, p);
+
+        // The first p-neighbor.
+        QuadFormPtr pn = it.next_neighbor();
+
+        // Create empty Hecke operators, which we'll then merge with the
+        // existing Hecke operators once we finish looping over all
+        // p-neighbors.
+        std::map<mpz_class, HeckePtr> hecke;
+        for (auto& chi : this->charSet_)
+        {
+            hecke[chi.conductor()] = std::make_shared<HeckeOperator<R,F>>(*this, chi);
+        }
+
+        // Loop over all p-neighbors.
+        while (pn != nullptr)
+        {
+            // Process the p-neighbor and update all Hecke operators.
+            this->update_hecke_operators(p, rep, pn, hecke);
+
+            // The next p-neighbor.
+            pn = it.next_neighbor();
+        }
+
+        // Update Hecke operator values.
+        this->heckeMutex_.lock();
+        for (auto& chi : this->charSet_)
+        {
+            this->heckeMap_[p][chi.conductor()]->merge(*hecke[chi.conductor()]);
+        }
+        this->heckeMutex_.unlock();
+    }
+}
+
+template<typename R, typename F>
+void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
+{
+    if (this->heckeMap_.count(p) > 0)
+    {
+        const std::map<R, HeckePtr> hecke = this->heckeMap_.find(p)->second;
+
+        std::cout << "Hecke operators at " << p << " already computed." << std::endl;
+        return;
+    }
+
+    // Build a Hecke operator map based on character conductors.
+    this->heckeMap_[p] = std::map<mpz_class, HeckePtr>();
+    for (auto& chi : this->charSet_)
+    {
+        this->heckeMap_[p][chi.conductor()] = std::make_shared<HeckeOperator<R,F>>(*this, chi);
+    }
+
+    if (numThreads > 0)
+    {
+        // Initialize the shared pointer used by threads to compute the Hecke
+        // operators.
+        this->genusVecIndex_ = 0;
+
+        // Create a vector of threads.
+        std::vector<std::thread> threads;
+        for (int64_t n = 0; n < numThreads; n++)
+        {
+            threads.push_back(std::thread(
+                &Genus<R,F>::threaded_compute_hecke_operators, this, p, n
+            ));
+        }
+
+        // Wait for threads to finish before moving along.
+        for (auto& t : threads)
+        {
+            t.join();
+        }
+    }
+    else
+    {
+        for (auto& cur : this->genusVec_)
+        {
+            // The neighbor iterator.
+            NeighborIterator<R,F> it(cur, p);
+
+            const GenusRep<R,F>& rep = this->find_genus_rep(cur);
+
+            // The first p-neighbor.
+            QuadFormPtr pn = it.next_neighbor();
+
+            // Loop over all p-neighbors.
+            while (pn != nullptr)
+            {
+                // Process the p-neighbor and update all Hecke operators.
+                this->update_hecke_operators(p, rep, pn, this->heckeMap_[p]);
+
+                // The next p-neighbor.
+                pn = it.next_neighbor();
+            }
+        }
+    }
+
+    //auto h = this->heckeMap_.find(p)->second;
+    //for (auto& chi : this->charSet_)
+    //{
+    //    auto mat = h.find(chi.conductor())->second;
+    //    std::cout << chi.conductor() << " " << p << " ";
+    //    mat->print();
+    //    std::cout << std::endl;
+    //}
+}
+
+template<typename R, typename F>
 mpz_class Genus<R,F>::dimension(const Character<R,F>& chi) const
 {
-    mpz_class dim = 0;
-    for (auto& rep : this->genusReps_)
+    if (this->dimensionMap_.count(chi.conductor()) > 0)
     {
-        dim += rep.dimension(chi);
+        return this->dimensionMap_.find(chi.conductor())->second;
     }
-    return dim;
+    else
+    {
+        return 0;
+    }
 }
 
 template<typename R, typename F>
 void Genus<R,F>::print(void) const
 {
-    for (auto& chi : this->charSet_)
-    {
-        std::cout << std::setw(10) << chi.conductor() << "   ";
-        std::cout << this->dimension(chi) << std::endl;
-    }
+    //std::cout << " conductor   dimension" << std::endl;
+    //for (auto& chi : this->charSet_)
+    //{
+    //    std::cout << std::setw(10) << chi.conductor() << "   ";
+    //    std::cout << this->dimension(chi) << std::endl;
+    //}
     //for (auto& q : this->genusVec_)
     //{
     //    std::cout << q << std::endl;

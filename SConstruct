@@ -12,6 +12,7 @@ srcs = Split('''
     IsometryZZ.cpp
     NeighborIteratorZZ.cpp
     QuadFormZZ.cpp
+    SparseMatrix.cpp
 ''')
 
 libs = Split('''

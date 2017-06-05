@@ -31,7 +31,7 @@ int main(int argc, char** argv)
     }
 
     QuadFormZZ q(a, b, c, f, g, h);
-    GenusZZ genus(q, 4);
+    GenusZZ genus(q);
 
     auto divs = Math::squarefree_divisors(q.discriminant());
     for (auto& d : divs)
@@ -40,8 +40,10 @@ int main(int argc, char** argv)
         genus.add_character(chi);
     }
 
-    genus.compute_genus();
-    std::cout << " conductor   dimension" << std::endl;
+    genus.compute_genus(0);
+
+    genus.compute_hecke_operators(2, 4);
+
     genus.print();
     
     return EXIT_SUCCESS;
