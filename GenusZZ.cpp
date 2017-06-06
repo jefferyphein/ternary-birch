@@ -32,7 +32,7 @@ void GenusZZ::set_dimensions(GenusRepZZ& rep)
 
     // Initialize the dimensions for each character to be 1. This will be set
     // to zero if we ever see a rho value of -1.
-    std::map<CharacterZZ, mpz_class> dimensionMap_;
+    std::map<CharacterZZ, int64_t> dimensionMap_;
     for (auto& chi : this->charSet_)
     {
         dimensionMap_[chi] = 1;

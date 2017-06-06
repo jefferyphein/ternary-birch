@@ -42,7 +42,7 @@ int main(int argc, char** argv)
 
     genus.compute_genus(0);
 
-    genus.compute_hecke_operators(2, 4);
+    genus.compute_hecke_operators(7, 0);
 
     genus.print();
     

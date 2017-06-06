@@ -8,9 +8,9 @@ typedef Isometry<mpz_class, mpq_class> IsometryQQ;
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
 
 template<>
-mpz_class CharacterZZ::rho(const IsometryQQ& s, const QuadFormZZ& q) const
+int64_t CharacterZZ::rho(const IsometryQQ& s, const QuadFormZZ& q) const
 {
-    mpz_class value = 1;
+    int64_t value = 1;
 
     if (this->ps_.size() != 0)
     {

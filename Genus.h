@@ -2,7 +2,6 @@
 #define __GENUS_H_
 
 #include <memory>
-#include <iomanip>
 #include <cassert>
 #include <unordered_set>
 #include <set>
@@ -16,8 +15,6 @@
 #include "Character.h"
 #include "HeckeOperator.h"
 
-//#define DEBUG
-
 template<typename R, typename F>
 class GenusRep
 {
@@ -27,23 +24,23 @@ public:
 
     GenusRep(QuadFormPtr qPtr);
 
-    const mpz_class& pos(const Character<R,F>& chi) const;
-    void set_position(const Character<R,F>& chi, const mpz_class& x);
-    const mpz_class& position(const Character<R,F>& chi) const;
+    int64_t pos(const Character<R,F>& chi) const;
+    void set_position(const Character<R,F>& chi, int64_t x);
+    int64_t position(const Character<R,F>& chi) const;
     void set_inverse(void);
     QuadFormPtr quad_form(void) const;
     IsometryPtr inverse(void) const;
 
-    void set_dimension(const Character<R,F>& chi, const mpz_class& dim);
-    mpz_class dimension(const Character<R,F>& chi) const;
+    void set_dimension(const Character<R,F>& chi, int64_t dim);
+    int64_t dimension(const Character<R,F>& chi) const;
 
     bool operator==(const GenusRep<R,F>& rep) const;
     bool operator<(const GenusRep<R,F>& rep) const;
 private:
     QuadFormPtr q_;
     IsometryPtr inv_;
-    std::map<R, mpz_class> positionMap_;
-    std::map<R, mpz_class> dimensionMap_;
+    std::map<R, int64_t> positionMap_;
+    std::map<R, int64_t> dimensionMap_;
 };
 
 template<typename R, typename F>
@@ -67,7 +64,7 @@ public:
 
     size_t size(void) const;
 
-    mpz_class dimension(const Character<R,F>& chi) const;
+    int64_t dimension(const Character<R,F>& chi) const;
 
     void compute_hecke_operators(const R& p, int64_t numThreads=0);
 
@@ -90,7 +87,7 @@ private:
     bool computed_ = false;
 
     /* Character dimensions. */
-    std::map<R, mpz_class> dimensionMap_;
+    std::map<R, int64_t> dimensionMap_;
 
     /* Attempts to add a new genus representative. */
     void add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor=nullptr);
@@ -147,10 +144,9 @@ private:
     std::map<R, std::map<R, HeckePtr>> heckeMap_;
 
     /* A helper function that updates Hecke operators. */
-    void update_hecke_operators(const R& p,
-                                const GenusRep<R,F>& rep,
+    void update_hecke_operators(const GenusRep<R,F>& rep,
                                 QuadFormPtr neighbor,
-                                std::map<mpz_class, HeckePtr>& hecke);
+                                std::map<R, std::map<int64_t, int64_t>>& rowMap);
 };
 
 template<typename R, typename F>
@@ -167,13 +163,13 @@ void GenusRep<R,F>::set_inverse(void)
 }
 
 template<typename R, typename F>
-void GenusRep<R,F>::set_position(const Character<R,F>& chi, const mpz_class& x)
+void GenusRep<R,F>::set_position(const Character<R,F>& chi, int64_t x)
 {
     this->positionMap_[chi.conductor()] = x;
 }
 
 template<typename R, typename F>
-const mpz_class& GenusRep<R,F>::position(const Character<R,F>& chi) const
+int64_t GenusRep<R,F>::position(const Character<R,F>& chi) const
 {
     return this->positionMap_.find(chi.conductor())->second;
 }
@@ -203,7 +199,7 @@ bool GenusRep<R,F>::operator<(const GenusRep<R,F>& rep) const
 }
 
 template<typename R, typename F>
-mpz_class GenusRep<R,F>::dimension(const Character<R,F>& chi) const
+int64_t GenusRep<R,F>::dimension(const Character<R,F>& chi) const
 {
     if (this->dimensionMap_.count(chi.conductor()) > 0)
     {
@@ -469,7 +465,7 @@ void Genus<R,F>::add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor)
 }
 
 template<typename R, typename F>
-void GenusRep<R,F>::set_dimension(const Character<R,F>& chi, const mpz_class& dim)
+void GenusRep<R,F>::set_dimension(const Character<R,F>& chi, int64_t dim)
 {
     this->dimensionMap_[chi.conductor()] = dim;
 }
@@ -506,10 +502,9 @@ std::shared_ptr<HeckeOperator<R,F>> Genus<R,F>::hecke_operator(const R& p, const
 }
 
 template<typename R, typename F>
-void Genus<R,F>::update_hecke_operators(const R& ,
-                                        const GenusRep<R,F>& rep,
+void Genus<R,F>::update_hecke_operators(const GenusRep<R,F>& rep,
                                         QuadFormPtr neighbor,
-                                        std::map<mpz_class, HeckePtr>& hecke)
+                                        std::map<R, std::map<int64_t, int64_t>>& rowMap)
 {
 #ifdef DEBUG
     assert( neighbor->isometry()->is_isometry(*this->q_, *neighbor) );
@@ -542,7 +537,7 @@ void Genus<R,F>::update_hecke_operators(const R& ,
     std::shared_ptr<Isometry<R,F>> aut = neighbor->isometry();
 
     // Compute the value of each primitive character.
-    std::map<R, R> primeValues;
+    std::map<R, int64_t> primeValues;
     for (auto& chi : this->primeCharSet_)
     {
         primeValues[chi.conductor()] = chi.rho(*aut, *this->q_);
@@ -552,24 +547,20 @@ void Genus<R,F>::update_hecke_operators(const R& ,
     // primitive characters we just computed.
     for (auto& chi : this->charSet_)
     {
-        R value = R(1);
+        int64_t row = rep.position(chi);
+        if (row == -1) { continue; }
+
+        int64_t col = rrep.position(chi);
+        if (col == -1) { continue; }
+
+        int64_t value = 1;
         auto facs = chi.primes();
         for (auto& fac : facs)
         {
             value *= primeValues[fac];
         }
 
-        mpz_class row = rep.position(chi);
-        if (row == -1) { continue; }
-
-        mpz_class col = rrep.position(chi);
-        if (col == -1) { continue; }
-
-        hecke[chi.conductor()]->update(row, col, value);
-
-        //this->heckeMutex_.lock();
-        //this->heckeMap_[p][chi.conductor()]->update(row, col, value);
-        //this->heckeMutex_.unlock();
+        rowMap[chi.conductor()][col] += value;
     }
 }
 
@@ -578,19 +569,30 @@ void Genus<R,F>::threaded_compute_hecke_operators(const R& p, int64_t)
 {
     while (true)
     {
+        // Obtain the mutex and determine the index of the genus rep this
+        // thread should process.
         this->genusMutex_.lock();
+        int64_t index = this->genusVecIndex_++;
+        this->genusMutex_.unlock();
 
         // Have we reached the end of the genus vector?
-        if (this->genusVecIndex_ >= this->genusVec_.size())
+        if (index >= this->genusVec_.size())
         {
             // If so, release the lock and return.
-            this->genusMutex_.unlock();
             return;
         }
 
         // Obtain a genus representative form to process and release the lock.
-        QuadFormPtr cur = this->genusVec_[this->genusVecIndex_++];
-        this->genusMutex_.unlock();
+        QuadFormPtr cur = this->genusVec_[index];
+
+        // Create a row map for each character. This will store temporary
+        // values which will then be updated all at once when we finish
+        // processing each p-neighbor.
+        std::map<R, std::map<int64_t, int64_t>> rowMap;
+        for (auto& chi : this->charSet_)
+        {
+            rowMap[chi.conductor()].clear();
+        }
 
         // The current genus representative object.
         const GenusRep<R,F>& rep = this->find_genus_rep(cur);
@@ -601,32 +603,27 @@ void Genus<R,F>::threaded_compute_hecke_operators(const R& p, int64_t)
         // The first p-neighbor.
         QuadFormPtr pn = it.next_neighbor();
 
-        // Create empty Hecke operators, which we'll then merge with the
-        // existing Hecke operators once we finish looping over all
-        // p-neighbors.
-        std::map<mpz_class, HeckePtr> hecke;
-        for (auto& chi : this->charSet_)
-        {
-            hecke[chi.conductor()] = std::make_shared<HeckeOperator<R,F>>(*this, chi);
-        }
-
         // Loop over all p-neighbors.
         while (pn != nullptr)
         {
             // Process the p-neighbor and update all Hecke operators.
-            this->update_hecke_operators(p, rep, pn, hecke);
+            this->update_hecke_operators(rep, pn, rowMap);
 
             // The next p-neighbor.
             pn = it.next_neighbor();
         }
 
-        // Update Hecke operator values.
-        this->heckeMutex_.lock();
+        // Obtain the Hecke lock, and update this row of the Hecke operator.
         for (auto& chi : this->charSet_)
         {
-            this->heckeMap_[p][chi.conductor()]->merge(*hecke[chi.conductor()]);
+            int64_t pos = rep.position(chi);
+            if (pos != -1)
+            {
+                this->heckeMutex_.lock();
+                this->heckeMap_[p][chi.conductor()]->update_row(pos, rowMap[chi.conductor()]);
+                this->heckeMutex_.unlock();
+            }
         }
-        this->heckeMutex_.unlock();
     }
 }
 
@@ -642,7 +639,7 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
     }
 
     // Build a Hecke operator map based on character conductors.
-    this->heckeMap_[p] = std::map<mpz_class, HeckePtr>();
+    this->heckeMap_[p] = std::map<R, HeckePtr>();
     for (auto& chi : this->charSet_)
     {
         this->heckeMap_[p][chi.conductor()] = std::make_shared<HeckeOperator<R,F>>(*this, chi);
@@ -656,6 +653,7 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
 
         // Create a vector of threads.
         std::vector<std::thread> threads;
+
         for (int64_t n = 0; n < numThreads; n++)
         {
             threads.push_back(std::thread(
@@ -678,6 +676,13 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
 
             const GenusRep<R,F>& rep = this->find_genus_rep(cur);
 
+            // Create a row map for each character.
+            std::map<R, std::map<int64_t, int64_t>> rowMap;
+            for (auto& chi : this->charSet_)
+            {
+                rowMap[chi.conductor()].clear();
+            }
+
             // The first p-neighbor.
             QuadFormPtr pn = it.next_neighbor();
 
@@ -685,10 +690,17 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
             while (pn != nullptr)
             {
                 // Process the p-neighbor and update all Hecke operators.
-                this->update_hecke_operators(p, rep, pn, this->heckeMap_[p]);
+                this->update_hecke_operators(rep, pn, rowMap);
 
                 // The next p-neighbor.
                 pn = it.next_neighbor();
+            }
+
+            // Add the current row to the Hecke operator.
+            for (auto& chi : this->charSet_)
+            {
+                const R& cond = chi.conductor();
+                this->heckeMap_[p][cond]->add_row(rep.position(chi), rowMap[cond]);
             }
         }
     }
@@ -704,7 +716,7 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
 }
 
 template<typename R, typename F>
-mpz_class Genus<R,F>::dimension(const Character<R,F>& chi) const
+int64_t Genus<R,F>::dimension(const Character<R,F>& chi) const
 {
     if (this->dimensionMap_.count(chi.conductor()) > 0)
     {

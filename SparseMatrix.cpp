@@ -4,37 +4,16 @@
 #include <gmpxx.h>
 #include "SparseMatrix.h"
 
-SparseMatrix::SparseMatrix(const mpz_class& rows, const mpz_class& cols)
+SparseMatrix::SparseMatrix(int64_t rows, int64_t cols)
 {
     this->rows_ = rows;
     this->cols_ = cols;
-    this->data_ = std::make_shared<std::map<mpz_class, std::map<mpz_class, mpz_class>>>();
-}
-
-void SparseMatrix::update(const mpz_class& row, const mpz_class& col, const mpz_class& delta)
-{
-    if (this->data_->count(row) > 0)
-    {
-        if ((*this->data_)[row].count(col) > 0)
-        {
-            (*this->data_)[row][col] += delta;
-        }
-        else
-        {
-            (*this->data_)[row][col] = delta;
-        }
-    }
-    else
-    {
-        std::map<mpz_class, mpz_class> temp;
-        (*this->data_)[row] = temp;
-        (*this->data_)[row][col] = delta;
-    } 
+    this->data_ = std::map<int64_t, std::map<int64_t, int64_t>>();
 }
 
 void SparseMatrix::print(void) const
 {
-    for (auto& row : *this->data_)
+    for (auto& row : this->data_)
     {
         std::cout << row.first;
         for (auto& col : row.second)
@@ -45,13 +24,25 @@ void SparseMatrix::print(void) const
     }
 }
 
-void SparseMatrix::merge(const SparseMatrix& mat)
+void SparseMatrix::update_row(int64_t rowNumber,
+                              const std::map<int64_t, int64_t>& theRow)
 {
-    for (auto& row : *mat.data_)
+    if (this->data_.count(rowNumber) == 0)
     {
-        for (auto& col : row.second)
+        this->data_[rowNumber] = theRow;
+    }
+    else
+    {
+        std::map<int64_t, int64_t>& storedRow = this->data_[rowNumber];
+        for (auto& temp : theRow)
         {
-            this->update(row.first, col.first, col.second);
+            storedRow[temp.first] += temp.second;
         }
     }
+}
+
+void SparseMatrix::add_row(int64_t rowNumber,
+                           const std::map<int64_t, int64_t>& theRow)
+{
+    this->data_[rowNumber] = theRow;
 }

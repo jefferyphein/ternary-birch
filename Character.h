@@ -12,7 +12,7 @@ public:
     Character(const std::vector<R>& ps);
     Character(const R& cond);
 
-    mpz_class rho(const Isometry<R,F>& s, const QuadForm<R,F>& q) const;
+    int64_t rho(const Isometry<R,F>& s, const QuadForm<R,F>& q) const;
     const R& conductor(void) const;
     const std::vector<R>& primes(void) const;
     bool operator<(const Character<R,F>& repr) const;

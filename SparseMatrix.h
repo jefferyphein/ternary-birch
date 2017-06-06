@@ -2,21 +2,22 @@
 #define __SPARSE_MATRIX_H_
 
 #include <memory>
+#include <unordered_map>
 
 class SparseMatrix
 {
 public:
     SparseMatrix() = default;
-    SparseMatrix(const mpz_class& rows, const mpz_class& cols);
+    SparseMatrix(int64_t rows, int64_t cols);
 
-    void update(const mpz_class& row, const mpz_class& col, const mpz_class& delta);
     void print(void) const;
-    void merge(const SparseMatrix& mat);
+    void update_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
+    void add_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
 
 private:
-    mpz_class rows_;
-    mpz_class cols_;
-    std::shared_ptr<std::map<mpz_class, std::map<mpz_class, mpz_class>>> data_;
+    int64_t rows_;
+    int64_t cols_;
+    std::map<int64_t, std::map<int64_t, int64_t>> data_;
 };
 
 #endif // __SPARSE_MATRIX_H_
