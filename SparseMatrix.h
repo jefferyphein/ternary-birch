@@ -13,6 +13,7 @@ public:
     void print(void) const;
     void update_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
     void add_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
+    int64_t num_rows(void) const;
 
 private:
     int64_t rows_;

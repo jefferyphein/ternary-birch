@@ -8,6 +8,7 @@ template<typename R, typename F>
 class NeighborIterator
 {
 public:
+    NeighborIterator() = default;
     NeighborIterator(std::shared_ptr<QuadForm<R,F>> q, const R& p);
 
     inline mpz_class num_neighbors(void) const;

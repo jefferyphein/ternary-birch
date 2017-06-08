@@ -15,7 +15,7 @@ void SparseMatrix::print(void) const
 {
     for (auto& row : this->data_)
     {
-        std::cout << row.first;
+        std::cout << row.first << " " << row.second.size();
         for (auto& col : row.second)
         {
             std::cout << " " << col.first << " " << col.second;
@@ -45,4 +45,9 @@ void SparseMatrix::add_row(int64_t rowNumber,
                            const std::map<int64_t, int64_t>& theRow)
 {
     this->data_[rowNumber] = theRow;
+}
+
+int64_t SparseMatrix::num_rows(void) const
+{
+    return this->data_.size();
 }

@@ -16,6 +16,7 @@ public:
     void print(void) const;
     void update_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
     void add_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
+    int64_t num_rows(void) const;
 
 private:
     int64_t dim_;
@@ -32,7 +33,7 @@ HeckeOperator<R,F>::HeckeOperator(const Genus<R,F>& genus, const Character<R,F>&
 template<typename R, typename F>
 void HeckeOperator<R,F>::print(void) const
 {
-    std::cout << this->dim_ << " " << this->dim_ << std::endl;
+    std::cout << this->m_.num_rows() << " " << this->dim_ << std::endl;
     this->m_.print();
 }
 
@@ -46,6 +47,12 @@ template<typename R, typename F>
 void HeckeOperator<R,F>::add_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow)
 {
     this->m_.add_row(rowNumber, theRow);
+}
+
+template<typename R, typename F>
+int64_t HeckeOperator<R,F>::num_rows(void) const
+{
+    return this->m_.num_rows();
 }
 
 #endif // __HECKE_OPERATOR_H_

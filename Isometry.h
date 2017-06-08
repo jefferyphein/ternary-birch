@@ -115,21 +115,17 @@ std::ostream& operator<<(std::ostream& os, std::shared_ptr<ChangeOfBasis<R,F>> s
 template<typename R, typename F>
 void Isometry<R,F>::print(std::ostream& os) const
 {
-    os << "[ ";
-    os << "[ " << this->a11 << ", " << this->a12 << ", " << this->a13 << " ], ";
-    os << "[ " << this->a21 << ", " << this->a22 << ", " << this->a23 << " ], ";
-    os << "[ " << this->a31 << ", " << this->a32 << ", " << this->a33 << " ]";
-    os << " ]";
+    os << this->a11 << " " << this->a12 << " " << this->a13 << " ";
+    os << this->a21 << " " << this->a22 << " " << this->a23 << " ";
+    os << this->a31 << " " << this->a32 << " " << this->a33;
 }
 
 template<typename R, typename F>
 void ChangeOfBasis<R,F>::print(std::ostream& os) const
 {
-    os << "[ ";
-    os << "[ " << this->a11 << ", " << this->a12 << ", " << this->a13 << " ], ";
-    os << "[ " << this->a21 << ", " << this->a22 << ", " << this->a23 << " ], ";
-    os << "[ " << this->a31 << ", " << this->a32 << ", " << this->a33 << " ]";
-    os << " ]";
+    os << this->a11 << " " << this->a12 << " " << this->a13 << " ";
+    os << this->a21 << " " << this->a22 << " " << this->a23 << " ";
+    os << this->a31 << " " << this->a32 << " " << this->a33;
 }
 
 template<typename R, typename F>

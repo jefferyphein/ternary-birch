@@ -8,6 +8,7 @@ srcs = Split('''
     main.cpp
     AutomorphismZZ.cpp
     CharacterZZ.cpp
+    Eigenvector.cpp
     GenusZZ.cpp
     IsometryZZ.cpp
     NeighborIteratorZZ.cpp
