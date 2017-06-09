@@ -11,10 +11,10 @@ public:
     NeighborIterator() = default;
     NeighborIterator(std::shared_ptr<QuadForm<R,F>> q, const R& p);
 
-    inline mpz_class num_neighbors(void) const;
+    inline int64_t num_neighbors(void) const;
     inline const mpz_class& prime(void) const;
 
-    std::shared_ptr<QuadForm<R,F>> get_neighbor(const mpz_class& pos) const;
+    std::shared_ptr<QuadForm<R,F>> get_neighbor(int64_t pos) const;
 
     std::shared_ptr<QuadForm<R,F>> next_neighbor(void);
 
@@ -23,16 +23,16 @@ private:
 
     std::shared_ptr<QuadForm<R,F>> q_;
     R p_;
-    mpz_class numNeighbors_;
+    int64_t numNeighbors_;
 
-    mpz_class pos_;
+    int64_t pos_;
     std::vector<R> isotropicVector_;
     std::shared_ptr<ChangeOfBasis<R,F>> s_;
     R aniso_;
 };
 
 template<typename R, typename F>
-mpz_class NeighborIterator<R,F>::num_neighbors(void) const
+int64_t NeighborIterator<R,F>::num_neighbors(void) const
 {
     return this->numNeighbors_;
 }

@@ -12,14 +12,23 @@ typedef ChangeOfBasis<mpz_class, mpq_class> ChangeOfBasisZZ;
 typedef Isometry<mpz_class, mpq_class> IsometryQQ;
 
 template<>
-NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_class& p) :
-    q_(q),
-    p_(abs(p)),
-    numNeighbors_(abs(p) + 1),
-    pos_(mpz_class(0)),
-    isotropicVector_(q->isotropic_vector(p)),
-    s_(std::make_shared<ChangeOfBasisZZ>(p))
+NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_class& p)
 {
+    // If someone really wants to compute primes larger than 2**63-1, then
+    // they should remove this condition. This limit has been placed here to
+    // allow for the use of int64_t instead of mpz_class for efficiency reasons.
+    if (abs(p) > mpz_class(std::numeric_limits<int64_t>::max()))
+    {
+        throw std::runtime_error("Supplied prime is too large.");
+    }
+
+    // Assign values.
+    this->q_ = q;
+    this->p_ = abs(p);
+    this->numNeighbors_ = abs(mpz_get_si(p.get_mpz_t())) + 1;
+    this->isotropicVector_ = q->isotropic_vector(p);
+    this->s_ = std::make_shared<ChangeOfBasisZZ>(p);
+
     // Normalize the initial isotropic vector.
     Math::normalize_vector(this->isotropicVector_, this->p_);
 
@@ -387,7 +396,7 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::next_neighbor(void)
 }
 
 template<>
-std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::get_neighbor(const mpz_class& pos) const
+std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::get_neighbor(int64_t pos) const
 {
     if (pos < 0 || pos > this->num_neighbors())
     {

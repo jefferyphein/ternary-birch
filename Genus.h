@@ -13,6 +13,7 @@
 #include <chrono>
 #include <fstream>
 #include <future>
+#include <atomic>
 #include "QuadForm.h"
 #include "NeighborIterator.h"
 #include "Character.h"
@@ -130,8 +131,9 @@ private:
     /* A queue of shared QuadForm pointers used for multithreading. */
     std::queue<QuadFormPtr> genusQueue_;
 
-    /* An index used to access GenusReps when computing Hecke operators. */
-    int64_t genusVecIndex_;
+    /* A thread-safe value used to access GenusReps when computing Hecke
+     * operators. */
+    std::atomic<int64_t> genusVecIndex_;
 
     /* A mutex used for accessing genus reps when multithreading. */
     std::mutex genusMutex_;
@@ -143,13 +145,9 @@ private:
      * eigenvalues. */
     std::vector<NeighborIterator<R,F>> eigenvalueNeighborVec_;
 
-    mpz_class neighborIndex_;
-
-    /* A mutex used to protect the neighbor iterator above. */
-    std::mutex neighborMutex_;
-
-    /* A mutex used to update eigenvalues. */
-    std::mutex eigenvalueMutex_;
+    /* A thread-safe value used to iterate over neighbors when computing
+     * Hecke eigenvalues. */
+    std::atomic<int64_t> neighborIndex_;
 
     ////////// GENUS DATA STRUCTURES
 
@@ -645,9 +643,7 @@ void Genus<R,F>::threaded_compute_hecke_operators(const R& p, int64_t)
     {
         // Obtain the mutex and determine the index of the genus rep this
         // thread should process.
-        this->genusMutex_.lock();
         int64_t index = this->genusVecIndex_++;
-        this->genusMutex_.unlock();
 
         // Have we reached the end of the genus vector?
         if (index >= this->genusVec_.size())
@@ -724,7 +720,7 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
     {
         // Initialize the shared pointer used by threads to compute the Hecke
         // operators.
-        this->genusVecIndex_ = 0;
+        this->genusVecIndex_.store(0);
 
         // Create a vector of threads.
         std::vector<std::thread> threads;
@@ -805,12 +801,12 @@ void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<Eigenvector*
 
     // Initialize a vector to keep track of the boundaries for our neighbor
     // index.
-    std::vector<mpz_class> boundaries;
+    std::vector<int64_t> boundaries;
     boundaries.reserve(numPrimes+1);
     boundaries.push_back(0);
 
     // Set the boundaries.
-    mpz_class maxNeighbors = 0;
+    int64_t maxNeighbors = 0;
     for (NeighborIterator<R,F>& temp : this->eigenvalueNeighborVec_)
     {
         maxNeighbors += temp.num_neighbors();
@@ -820,9 +816,7 @@ void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<Eigenvector*
     while (true)
     {
         // Get a neighbor index.
-        this->neighborMutex_.lock();
-        mpz_class nIndex = this->neighborIndex_++;
-        this->neighborMutex_.unlock();
+        int64_t nIndex = this->neighborIndex_++;
 
         // If we've exceeded the maximum number of neighbors, we're done.
         if (nIndex >= maxNeighbors)
@@ -839,7 +833,7 @@ void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<Eigenvector*
 
         // The prime and p-neighbor number that we're going to compute.
         const R& p = this->eigenvalueNeighborVec_[itIndex].prime();
-        mpz_class N = nIndex - boundaries[itIndex];
+        int64_t N = nIndex - boundaries[itIndex];
 
         // Get the p-neighhor, reduce it, and identify its associated
         // genus rep.
@@ -967,7 +961,7 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         }
 
         // Initialize the neighbor index.
-        this->neighborIndex_ = 0;
+        this->neighborIndex_.store(0);
 
         // Create promises.
         std::vector<std::promise<std::map<Eigenvector*, std::map<R, int64_t>>>> aps(numThreads);
@@ -990,9 +984,8 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         // Set eigenvalues.
         for (int64_t n = 0; n < numThreads; n++)
         {
-            std::future<std::map<Eigenvector*, std::map<R, int64_t>>> f(aps[n].get_future());
-            std::map<Eigenvector*, std::map<R, int64_t>> values = f.get();
-            for (auto& it1 : values)
+            auto eigenvalues = aps[n].get_future().get();
+            for (auto& it1 : eigenvalues)
             {
                 Eigenvector* vec = it1.first;
                 for (auto& it2 : it1.second)
