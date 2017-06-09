@@ -32,8 +32,8 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
 
     if (this->isotropicVector_[0] == 1)
     {
-        mpz_class u = this->isotropicVector_[1];
-        mpz_class v = this->isotropicVector_[2];
+        const mpz_class& u = this->isotropicVector_[1];
+        const mpz_class& v = this->isotropicVector_[2];
 
         this->s_->a11 = 1;
         this->s_->a21 = u;
@@ -59,7 +59,7 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
     }
     else if (this->isotropicVector_[1] == 1)
     {
-        mpz_class u = this->isotropicVector_[2];
+        const mpz_class& u = this->isotropicVector_[2];
 
         this->s_->a21 = 1;
         this->s_->a31 = u;
@@ -153,15 +153,15 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
 }
 
 template<>
-std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_class>& vec)
+const std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_class>& vec) const
 {
     // The prime integer.
-    mpz_class p = this->p_;
+    //mpz_class p = this->p_;
 
     // Normalize the isotropic vector modulo p, then adjust its coefficients
     // so that their absolute value is as small as possible.
-    Math::normalize_vector(vec, p);
-    Math::fix_vector(vec, p);
+    Math::normalize_vector(vec, this->p_);
+    Math::fix_vector(vec, this->p_);
 
     // The coefficients of the p-neighbor.
     mpz_class a, b, c, f, g, h;
@@ -171,8 +171,8 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
 
     if (vec[0] == 1)
     {
-        mpz_class u = vec[1];
-        mpz_class v = vec[2];
+        const mpz_class& u = vec[1];
+        const mpz_class& v = vec[2];
 
         // Initialize isometry to...
         // | 1  0  0 |
@@ -201,7 +201,7 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
     }
     else if (vec[1] == 1)
     {
-        mpz_class u = vec[2];
+        const mpz_class& u = vec[2];
 
         // Initialize isometry to be...
         // | 0  1  0 |
@@ -247,7 +247,7 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
         h = this->q_->g();
     }
 
-    if (g % p == 0)
+    if (g % this->p_ == 0)
     {
         // Multiply isometry on the right by...
         // |  1  0  0 |
@@ -262,12 +262,12 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
     }
 
     // Scalar to make (h % p) == 0.
-    mpz_class scalar = (-h * Math::modinv(g, p)) % p;
+    mpz_class scalar = (-h * Math::modinv(g, this->p_)) % this->p_;
 
-    if (p != 2)
+    if (this->p_ != 2)
     {
-        if (scalar < 0 && -scalar > (p-1)/2) { scalar += p; }
-        else if (scalar > 0 && scalar > (p-1)/2) { scalar -= p; }
+        if (scalar < 0 && -scalar > (this->p_-1)/2) { scalar += this->p_; }
+        else if (scalar > 0 && scalar > (this->p_-1)/2) { scalar -= this->p_; }
     }
 
     // Multiply on the right by...
@@ -285,16 +285,16 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
     h += scalar * g;
 
 #ifdef DEBUG
-    assert( h % p == 0 );
+    assert( h % this->p_ == 0 );
 #endif
 
     // Avoid recomputing p*p repeatedly.
-    mpz_class pp = p*p;
+    mpz_class pp = this->p_*this->p_;
 
     // Scalar to make (a % pp) == 0.
     scalar = (-a * Math::modinv(g, pp)) % pp;
 
-    if (p != 2)
+    if (this->p_ != 2)
     {
         if (scalar < 0 && -scalar > (pp-1)/2) { scalar += pp; }
         else if (scalar > 0 && scalar > (pp-1)/2) { scalar -= pp; }
@@ -321,18 +321,18 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_c
     // | 1/p  0   0 |
     // |  0   1   0 |
     // |  0   0   p |
-    s->a11 /= p;
-    s->a21 /= p;
-    s->a31 /= p;
-    s->a13 *= p;
-    s->a23 *= p;
-    s->a33 *= p;
+    s->a11 /= this->p_;
+    s->a21 /= this->p_;
+    s->a31 /= this->p_;
+    s->a13 *= this->p_;
+    s->a23 *= this->p_;
+    s->a33 *= this->p_;
 
     // Update coefficients.
     a /= pp;
     c *= pp;
-    f *= p;
-    h /= p;
+    f *= this->p_;
+    h /= this->p_;
 
 #ifdef DEBUG
     assert( s->is_isometry(*this->q_, a, b, c, f, g, h) );
@@ -353,7 +353,7 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::next_neighbor(void)
     // Return nullptr if no more neighbors to compute.
     if (this->pos_ >= this->numNeighbors_) { return nullptr; }
 
-    mpz_class p = this->p_;
+    const mpz_class& p = this->p_;
 
     // Make a copy of the initial isotropic vector.
     std::vector<mpz_class> vec(this->isotropicVector_);
@@ -384,4 +384,37 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::next_neighbor(void)
     ++this->pos_;
 
     return qq;
+}
+
+template<>
+std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::get_neighbor(const mpz_class& pos) const
+{
+    if (pos < 0 || pos > this->num_neighbors())
+    {
+        return nullptr;
+    }
+
+    std::vector<mpz_class> vec(this->isotropicVector_);
+
+    if (pos < this->p_)
+    {
+        vec[0] = (vec[0] + pos *
+            (this->s_->a12 - this->s_->a13 * this->aniso_ * pos)) % this->p_;
+        vec[1] = (vec[1] + pos *
+            (this->s_->a22 - this->s_->a23 * this->aniso_ * pos)) % this->p_;
+        vec[2] = (vec[2] + pos *
+            (this->s_->a32 - this->s_->a33 * this->aniso_ * pos)) % this->p_;
+    }
+    else
+    {
+        vec[0] = this->s_->a13;
+        vec[1] = this->s_->a23;
+        vec[2] = this->s_->a33;
+    }
+
+#ifdef DEBUG
+    assert( this->q_->evaluate(vec) % this->p_ == 0 );
+#endif
+
+    return this->build_neighbor(vec);
 }

@@ -12,6 +12,7 @@
 #include <mutex>
 #include <chrono>
 #include <fstream>
+#include <future>
 #include "QuadForm.h"
 #include "NeighborIterator.h"
 #include "Character.h"
@@ -79,8 +80,10 @@ public:
     HeckePtr hecke_operator(const R& p, const Character<R,F>& chi);
 
     void import_eigenvectors(const std::string& filename);
+    void import_genus(const std::string& filename);
 
     void compute_eigenvalues(const R& p, int64_t numThreads=0);
+    void compute_eigenvalues(const std::vector<R>& ps, int64_t numThreads=0);
 
     /* Computes the full genus. */
     // TODO: MAKE THIS PRIVATE. THIS IS PUBLIC FOR TESTING PURPSOES ONLY.
@@ -118,7 +121,7 @@ private:
     void threaded_compute_hecke_operators(const R& p, int64_t threadid);
 
     /* This function is passed to threads, accesses p-neighbors, and computes eigenvalues. */
-    void threaded_compute_eigenvalues(const R& p, const GenusRep<R,F>& g, int64_t threadid);
+    void threaded_compute_eigenvalues(std::promise<std::map<Eigenvector*, std::map<R, int64_t>>>& aps);
 
     /* A vector of booleans used to determine whether a thread is blocked due
      * to there being no objects in the genusQueue_. */
@@ -138,7 +141,9 @@ private:
 
     /* A neighbor iterator object to be shared amongst threads when computing
      * eigenvalues. */
-    NeighborIterator<R,F> eigenvalueNeighborIter_;
+    std::vector<NeighborIterator<R,F>> eigenvalueNeighborVec_;
+
+    mpz_class neighborIndex_;
 
     /* A mutex used to protect the neighbor iterator above. */
     std::mutex neighborMutex_;
@@ -777,38 +782,68 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
 }
 
 template<typename R, typename F>
-void Genus<R,F>::threaded_compute_eigenvalues(const R& p, const GenusRep<R,F>&, int64_t)
+void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<Eigenvector*, std::map<R, int64_t>>>& aps)
 {
-    // Initialize the temporary eigenvalues for this thread.
-    std::map<Eigenvector*, int64_t> aps;
+    // Initialize running eigenvalue tallies.
+    std::map<Eigenvector*, std::map<R, int64_t>> values;
     for (auto& it : this->eigenvectorMap_)
     {
         for (Eigenvector& vec : it.second)
         {
-            aps[&vec] = 0;
+            for (NeighborIterator<R,F>& neighborIt : this->eigenvalueNeighborVec_)
+            {
+                values[&vec][neighborIt.prime()] = 0;
+            }
         }
+    }
+
+    // A NeighborIterator pointer.
+    int64_t itIndex = 0;
+
+    // The number of primes we're going to compute.
+    int64_t numPrimes = this->eigenvalueNeighborVec_.size();
+
+    // Initialize a vector to keep track of the boundaries for our neighbor
+    // index.
+    std::vector<mpz_class> boundaries;
+    boundaries.reserve(numPrimes+1);
+    boundaries.push_back(0);
+
+    // Set the boundaries.
+    mpz_class maxNeighbors = 0;
+    for (NeighborIterator<R,F>& temp : this->eigenvalueNeighborVec_)
+    {
+        maxNeighbors += temp.num_neighbors();
+        boundaries.push_back(maxNeighbors);
     }
 
     while (true)
     {
+        // Get a neighbor index.
         this->neighborMutex_.lock();
-        QuadFormPtr neighbor = this->eigenvalueNeighborIter_.next_neighbor();
+        mpz_class nIndex = this->neighborIndex_++;
         this->neighborMutex_.unlock();
 
-        if (neighbor == nullptr)
+        // If we've exceeded the maximum number of neighbors, we're done.
+        if (nIndex >= maxNeighbors)
         {
-            this->eigenvalueMutex_.lock();
-            for (auto& it : this->eigenvectorMap_)
-            {
-                for (Eigenvector& vec : it.second)
-                {
-                    this->eigenvalueMap_[&vec][p] += aps[&vec];
-                }
-            }
-            this->eigenvalueMutex_.unlock();
+            aps.set_value(std::move(values));
             return;
         }
 
+        // Update the NeighborIterator pointer.
+        while (nIndex >= boundaries[itIndex+1])
+        {
+            ++itIndex;
+        }
+
+        // The prime and p-neighbor number that we're going to compute.
+        const R& p = this->eigenvalueNeighborVec_[itIndex].prime();
+        mpz_class N = nIndex - boundaries[itIndex];
+
+        // Get the p-neighhor, reduce it, and identify its associated
+        // genus rep.
+        QuadFormPtr neighbor = this->eigenvalueNeighborVec_[itIndex].get_neighbor(N);
         QuadFormPtr reduced = QuadForm<R,F>::reduce(*neighbor);
         const GenusRep<R,F>& rep = this->find_genus_rep(reduced);
 
@@ -873,14 +908,15 @@ void Genus<R,F>::threaded_compute_eigenvalues(const R& p, const GenusRep<R,F>&, 
 
             // Compute the value of this character.
             int64_t value = 1;
-            for (const R& p : chi.primes())
+            for (const R& prime : chi.primes())
             {
-                value *= primeValues[p];
+                value *= primeValues[prime];
             }
 
-            for (auto& vec : it.second)
+            // Update local eigenvalues.
+            for (Eigenvector& vec : it.second)
             {
-                aps[&vec] += (vec[pos] * value);
+                values[&vec][p] += (vec[pos] * value);
             }
         }
     }
@@ -889,6 +925,13 @@ void Genus<R,F>::threaded_compute_eigenvalues(const R& p, const GenusRep<R,F>&, 
 template<typename R, typename F>
 void Genus<R,F>::compute_eigenvalues(const R& p, int64_t numThreads)
 {
+    std::vector<R> ps = {p};
+    this->compute_eigenvalues(ps, numThreads);
+}
+
+template<typename R, typename F>
+void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThreads)
+{
     // Throw an error if there are no eigenvectors.
     if (this->eigenvectorMap_.size() == 0)
     {
@@ -896,15 +939,16 @@ void Genus<R,F>::compute_eigenvalues(const R& p, int64_t numThreads)
     }
 
     // Initialize the eigenvalues; this will be updated as we go.
+    this->eigenvalueMap_.clear();
     for (auto& it : this->eigenvectorMap_)
     {
         for (Eigenvector& vec : it.second)
         {
-            if (this->eigenvalueMap_.count(&vec) == 0)
+            this->eigenvalueMap_[&vec] = std::move(std::map<R, int64_t>());
+            for (auto& p : ps)
             {
-                this->eigenvalueMap_[&vec] = std::move(std::map<R, int64_t>());
+                this->eigenvalueMap_[&vec][p] = 0;
             }
-            this->eigenvalueMap_[&vec][p] = 0;
         }
     }
 
@@ -917,14 +961,23 @@ void Genus<R,F>::compute_eigenvalues(const R& p, int64_t numThreads)
     if (numThreads > 0)
     {
         // Assign the shared neighbor iterator.
-        this->eigenvalueNeighborIter_ = std::move(NeighborIterator<R,F>(q, p));
+        for (auto& p : ps)
+        {
+            this->eigenvalueNeighborVec_.push_back(std::move(NeighborIterator<R,F>(q, p)));
+        }
+
+        // Initialize the neighbor index.
+        this->neighborIndex_ = 0;
+
+        // Create promises.
+        std::vector<std::promise<std::map<Eigenvector*, std::map<R, int64_t>>>> aps(numThreads);
 
         // Create the threads.
         std::vector<std::thread> threads;
         for (int64_t n = 0; n < numThreads; n++)
         {
             threads.push_back(std::thread(
-                &Genus<R,F>::threaded_compute_eigenvalues, this, p, g, n
+                &Genus<R,F>::threaded_compute_eigenvalues, this, std::ref(aps[n])
             ));
         }
 
@@ -933,94 +986,113 @@ void Genus<R,F>::compute_eigenvalues(const R& p, int64_t numThreads)
         {
             t.join();
         }
+
+        // Set eigenvalues.
+        for (int64_t n = 0; n < numThreads; n++)
+        {
+            std::future<std::map<Eigenvector*, std::map<R, int64_t>>> f(aps[n].get_future());
+            std::map<Eigenvector*, std::map<R, int64_t>> values = f.get();
+            for (auto& it1 : values)
+            {
+                Eigenvector* vec = it1.first;
+                for (auto& it2 : it1.second)
+                {
+                    const R& p = it2.first;
+                    this->eigenvalueMap_[vec][p] += it2.second;
+                }
+            }
+        }
     }
     else
     {
-        // Build the neighbor iterator and let's get started.
-        NeighborIterator<R,F> it(q, p);
-        QuadFormPtr neighbor = it.next_neighbor();
-
-        while (neighbor != nullptr)
+        for (const R& p : ps)
         {
-            QuadFormPtr reduced = QuadForm<R,F>::reduce(*neighbor);
-            const GenusRep<R,F>& rep = this->find_genus_rep(reduced);
+            // Build the neighbor iterator and let's get started.
+            NeighborIterator<R,F> it(q, p);
+            QuadFormPtr neighbor = it.next_neighbor();
     
-            // Determine whether we actually need to compute anything for this
-            // p-neighbor.
-            bool needed = false;
-            for (auto& it : this->eigenvectorMap_)
+            while (neighbor != nullptr)
             {
-                const R& cond = it.first.conductor();
-                int64_t relPos = rep.position(cond);
-                if (relPos == -1) { continue; }
-    
-                for (auto& vec : it.second)
+                QuadFormPtr reduced = QuadForm<R,F>::reduce(*neighbor);
+                const GenusRep<R,F>& rep = this->find_genus_rep(reduced);
+        
+                // Determine whether we actually need to compute anything for this
+                // p-neighbor.
+                bool needed = false;
+                for (auto& it : this->eigenvectorMap_)
                 {
-                    if (vec[relPos] == 0) { continue; }
-                    needed = true;
+                    const R& cond = it.first.conductor();
+                    int64_t relPos = rep.position(cond);
+                    if (relPos == -1) { continue; }
+        
+                    for (auto& vec : it.second)
+                    {
+                        if (vec[relPos] == 0) { continue; }
+                        needed = true;
+                    }
                 }
-            }
-    
-            // If we don't need to compute anything, get the next neighbor and
-            // continue.
-            if (!needed)
-            {
+        
+                // If we don't need to compute anything, get the next neighbor and
+                // continue.
+                if (!needed)
+                {
+                    neighbor = it.next_neighbor();
+                    continue;
+                }
+        
+                // Multiply the p-neighbor isometry on the right by the reduction
+                // isometry. This now represents an isometry from the original
+                // quadratic form to the genus representative isometric to this
+                // p-neighbor.
+                neighbor->isometry()->multiply_on_right_by(reduced->isometry());
+            
+#ifdef DEBUG
+                assert( neighbor->isometry()->is_isometry(*this->q_, *rep.quad_form()) );
+#endif
+            
+                // Obtain an automorphism of the original quadratic form.
+                neighbor->isometry()->multiply_on_right_by(rep.inverse());
+            
+#ifdef DEBUG
+                assert( neighbor->isometry()->is_automorphism(*this->q_) );
+#endif
+            
+                // Convenient reference for the automorphism we'll use.
+                std::shared_ptr<Isometry<R,F>> aut = neighbor->isometry();
+        
+                // Compute the character value for each of the primitive characters.
+                std::map<R,int64_t> primeValues;
+                for (const Character<R,F>& chi : this->primeCharSet_)
+                {
+                    primeValues[chi.conductor()] = chi.rho(*aut, *this->q_);
+                }
+        
+                for (auto& it : this->eigenvectorMap_)
+                {
+                    // Get the character and the relative position of this genus rep
+                    // with respect to the character. If the p-neighbor we computed
+                    // doesn't contribute to this eigenvector, skip it.
+                    const Character<R,F>& chi = it.first;
+                    int64_t pos = rep.position(chi);
+                    if (pos == -1) { continue; }
+        
+                    // Compute the value of this character.
+                    int64_t value = 1;
+                    for (const R& p : chi.primes())
+                    {
+                        value *= primeValues[p];
+                    }
+        
+                    // Loop over the eigenvectors associated to this character.
+                    for (auto& vec : it.second)
+                    {
+                        //aps[&vec] += (vec[pos] * value);
+                        this->eigenvalueMap_[&vec][p] += (vec[pos] * value);
+                    }
+                }
+        
                 neighbor = it.next_neighbor();
-                continue;
             }
-    
-            // Multiply the p-neighbor isometry on the right by the reduction
-            // isometry. This now represents an isometry from the original
-            // quadratic form to the genus representative isometric to this
-            // p-neighbor.
-            neighbor->isometry()->multiply_on_right_by(reduced->isometry());
-        
-#ifdef DEBUG
-            assert( neighbor->isometry()->is_isometry(*this->q_, *rep.quad_form()) );
-#endif
-        
-            // Obtain an automorphism of the original quadratic form.
-            neighbor->isometry()->multiply_on_right_by(rep.inverse());
-        
-#ifdef DEBUG
-            assert( neighbor->isometry()->is_automorphism(*this->q_) );
-#endif
-        
-            // Convenient reference for the automorphism we'll use.
-            std::shared_ptr<Isometry<R,F>> aut = neighbor->isometry();
-    
-            // Compute the character value for each of the primitive characters.
-            std::map<R,int64_t> primeValues;
-            for (const Character<R,F>& chi : this->primeCharSet_)
-            {
-                primeValues[chi.conductor()] = chi.rho(*aut, *this->q_);
-            }
-    
-            for (auto& it : this->eigenvectorMap_)
-            {
-                // Get the character and the relative position of this genus rep
-                // with respect to the character. If the p-neighbor we computed
-                // doesn't contribute to this eigenvector, skip it.
-                const Character<R,F>& chi = it.first;
-                int64_t pos = rep.position(chi);
-                if (pos == -1) { continue; }
-    
-                // Compute the value of this character.
-                int64_t value = 1;
-                for (const R& p : chi.primes())
-                {
-                    value *= primeValues[p];
-                }
-    
-                // Loop over the eigenvectors associated to this character.
-                for (auto& vec : it.second)
-                {
-                    //aps[&vec] += (vec[pos] * value);
-                    this->eigenvalueMap_[&vec][p] += (vec[pos] * value);
-                }
-            }
-    
-            neighbor = it.next_neighbor();
         }
     }
     
@@ -1028,16 +1100,18 @@ void Genus<R,F>::compute_eigenvalues(const R& p, int64_t numThreads)
     for (auto& it : this->eigenvectorMap_)
     {
         const Character<R,F>& chi = it.first;
-        const R& cond = chi.conductor();
     
         // Update the eigenvalues.
         for (auto& vec : it.second)
         {
             int64_t relPos = g.position(chi);
+            for (const R& p : ps)
+            {
 #ifdef DEBUG
-            assert( this->eigenvalueMap_[&vec][p] % vec[relPos] == 0 );
+                assert( this->eigenvalueMap_[&vec][p] % vec[relPos] == 0 );
 #endif
-            this->eigenvalueMap_[&vec][p] /= vec[relPos];
+                this->eigenvalueMap_[&vec][p] /= vec[relPos];
+            }
         }
     }
 }
@@ -1093,6 +1167,36 @@ void Genus<R,F>::print(void) const
         }
     }
     std::cout << std::endl;
+}
+
+template<typename R, typename F>
+void Genus<R,F>::import_genus(const std::string& filename)
+{
+    std::ifstream infile(filename.c_str(), std::ios::in);
+
+    if (!infile.is_open())
+    {
+        throw std::runtime_error("Unable to open input file.");
+    }
+
+    int64_t dim = 0;
+    infile >> dim;
+
+    for (int64_t n = 0; n < dim; n++)
+    {
+        mpz_class a, b, c, f, g, h;
+        mpq_class a11, a12, a13, a21, a22, a23, a31, a32, a33;
+
+        infile >> a >> b >> c >> f >> g >> h;
+        infile >> a11 >> a12 >> a13 >> a21 >> a22 >> a23 >> a31 >> a32 >> a33;
+
+        QuadForm<R,F> q(a, b, c, f, g, h);
+        QuadFormPtr qq = QuadForm<R,F>::reduce(q, false);
+        auto s = std::make_shared<Isometry<R,F>>(a11, a12, a13, a21, a22, a23, a31, a32, a33);
+        qq->isometry(s);
+
+        this->add_genus_rep(qq);
+    }
 }
 
 template<typename R, typename F>
