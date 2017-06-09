@@ -25,6 +25,7 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
     // Assign values.
     this->q_ = q;
     this->p_ = abs(p);
+    this->pos_ = 0;
     this->numNeighbors_ = abs(mpz_get_si(p.get_mpz_t())) + 1;
     this->isotropicVector_ = q->isotropic_vector(p);
     this->s_ = std::make_shared<ChangeOfBasisZZ>(p);
