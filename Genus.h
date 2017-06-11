@@ -782,7 +782,7 @@ void Genus<R,F>::threaded_compute_hecke_operators(const R& p, int64_t)
             if (pos != -1)
             {
                 this->heckeMutex_.lock();
-                this->heckeMap_[p][cond]->update_row(pos, rowMap[cond]);
+                this->heckeMap_[cond][p]->update_row(pos, rowMap[cond]);
                 this->heckeMutex_.unlock();
             }
         }
@@ -797,20 +797,41 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
         this->compute_genus(this->genusNumThreads);
     }
 
-    if (this->heckeMap_.count(p) > 0)
-    {
-        const std::map<R, HeckePtr> hecke = this->heckeMap_.find(p)->second;
+    //if (this->heckeMap_.count(p) > 0)
+    //{
+    //    const std::map<R, HeckePtr> hecke = this->heckeMap_.find(p)->second;
 
-        std::cerr << "Hecke operators at " << p << " already computed." << std::endl;
-        return;
-    }
+    //    std::cerr << "Hecke operators at " << p << " already computed." << std::endl;
+    //    return;
+    //}
 
     // Build a Hecke operator map based on character conductors.
-    this->heckeMap_[p] = std::map<R, HeckePtr>();
+    //this->heckeMap_[p] = std::map<R, HeckePtr>();
+    //for (auto& chi : this->charSet_)
+    //{
+    //    this->heckeMap_[p][chi.conductor()] = std::make_shared<HeckeOperator<R,F>>(*this, chi);
+    //}
+
+    bool needToCompute = false;
     for (auto& chi : this->charSet_)
     {
-        this->heckeMap_[p][chi.conductor()] = std::make_shared<HeckeOperator<R,F>>(*this, chi);
+        const R& cond = chi.conductor();
+
+        // Create map for this conductor, if necessary.
+        if (this->heckeMap_.count(cond) == 0)
+        {
+            this->heckeMap_[cond] = std::move(std::map<R, HeckePtr>());
+        }
+
+        // Create Hecke operator for this prime, if necessary.
+        if (this->heckeMap_[cond].count(p) == 0)
+        {
+            this->heckeMap_[cond][p] = std::make_shared<HeckeOperator<R,F>>(*this, chi);
+            needToCompute = true;
+        }
     }
+
+    if (!needToCompute) { return; }
 
     if (numThreads > 0)
     {
@@ -867,7 +888,7 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
             for (auto& chi : this->charSet_)
             {
                 const R& cond = chi.conductor();
-                this->heckeMap_[p][cond]->add_row(rep.position(chi), rowMap[cond]);
+                this->heckeMap_[cond][p]->add_row(rep.position(chi), rowMap[cond]);
             }
         }
     }
@@ -1292,16 +1313,18 @@ void Genus<R,F>::print(std::ostream& os) const
 
     for (auto& it1 : this->heckeMap_)
     {
-        const R& p = it1.first;
-        const std::map<R, HeckePtr>& charMap = it1.second;
-        for (auto& it2 : charMap)
+        const R& cond = it1.first;
+        const std::map<R, HeckePtr>& heckeMap = it1.second;
+        for (auto& it2 : heckeMap)
         {
+            const R& p = it2.first;
             HeckePtr hecke = it2.second;
-            os << it2.first << " " << p << " ";
+            os << cond << " " << p << " ";
             os << *hecke;
             os << std::endl << std::endl;
         }
     }
+
     os << std::endl;
 }
 
@@ -1345,6 +1368,36 @@ void Genus<R,F>::import_genus(const std::string& filename)
         }
 
         this->add_genus_rep(qq);
+    }
+
+    // Read Hecke operators from file.
+    R cond, p;
+    infile >> cond >> p;
+
+    // Create character and add it to the genus.
+    Character<R,F> chi(cond);
+    this->add_character(chi);
+
+    // Create map for this conductor, if one doesn't already exist.
+    if (this->heckeMap_.count(cond) == 0)
+    {
+        this->heckeMap_[cond] = std::move(std::map<R, HeckePtr>());
+    }
+
+    // Continue reading file until we reach the end.
+    while (!infile.eof())
+    {
+        // Create shared pointer to Hecke operator.
+        std::shared_ptr<HeckeOperator<R,F>> hecke = std::make_shared<HeckeOperator<R,F>>();
+
+        // Import values into Hecke operator.
+        hecke->import(infile);
+
+        // Assign Hecke operator.
+        this->heckeMap_[cond][p] = hecke;
+
+        // Attempt to read conductor and prime from file.
+        infile >> cond >> p;
     }
 }
 

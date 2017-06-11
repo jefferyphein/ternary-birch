@@ -1,6 +1,7 @@
 #ifndef __HECKE_OPERATOR_H_
 #define __HECKE_OPERATOR_H_
 
+#include <iostream>
 #include "SparseMatrix.h"
 #include "Genus.h"
 
@@ -17,6 +18,7 @@ public:
     void update_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
     void add_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
     int64_t num_rows(void) const;
+    void import(std::ifstream& is);
 
 private:
     int64_t dim_;
@@ -60,6 +62,28 @@ std::ostream& operator<<(std::ostream& os, const HeckeOperator<R,F>& hecke)
 {
     hecke.print(os);
     return os;
+}
+
+template<typename R, typename F>
+void HeckeOperator<R,F>::import(std::ifstream& is)
+{
+    int64_t rows;
+    is >> rows >> this->dim_;
+    for (int64_t n = 0; n < rows; n++)
+    {
+        int64_t row, cols;
+        is >> row >> cols;
+
+        std::map<int64_t, int64_t> theRow;
+
+        for (int64_t m = 0; m < cols; m++)
+        {
+            int64_t col, value;
+            is >> col >> value;
+            theRow[col] = value;
+            this->add_row(row, theRow);
+        }
+    }
 }
 
 #endif // __HECKE_OPERATOR_H_
