@@ -19,6 +19,7 @@
 #include "Character.h"
 #include "HeckeOperator.h"
 #include "Eigenvector.h"
+#include "Math.h"
 
 template<typename R, typename F>
 class GenusRep
@@ -59,17 +60,23 @@ public:
     typedef std::shared_ptr<QuadForm<R,F>> QuadFormPtr;
     typedef std::shared_ptr<HeckeOperator<R,F>> HeckePtr;
 
-    Genus(const QuadForm<R,F>& q);
+    Genus(const QuadForm<R,F>& q, int64_t numThreads=0);
+    Genus(const std::string& filename);
+
+    bool computed(void) const;
 
     QuadFormPtr quad_form(void) const;
 
+    const R& discriminant(void) const;
+
     R smallest_good_prime(void) const;
+    std::vector<R> bad_primes(void) const;
 
     void add_character(const Character<R,F>& chi);
 
     void set_dimensions(GenusRep<R,F>& rep);
 
-    void print(void) const;
+    void print(std::ostream& os) const;
 
     size_t size(void) const;
 
@@ -81,14 +88,10 @@ public:
     HeckePtr hecke_operator(const R& p, const Character<R,F>& chi);
 
     void import_eigenvectors(const std::string& filename);
-    void import_genus(const std::string& filename);
+    void export_eigenvectors(const std::string& filename);
 
     void compute_eigenvalues(const R& p, int64_t numThreads=0);
     void compute_eigenvalues(const std::vector<R>& ps, int64_t numThreads=0);
-
-    /* Computes the full genus. */
-    // TODO: MAKE THIS PRIVATE. THIS IS PUBLIC FOR TESTING PURPSOES ONLY.
-    void compute_genus(int64_t numThreads=0);
 
 private:
     ////////// GENERAL MEMBER VARIABLES
@@ -106,10 +109,22 @@ private:
     std::map<R, int64_t> dimensionMap_;
 
     /* Attempts to add a new genus representative. */
-    void add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor=nullptr);
+    void add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor=nullptr, bool force=false);
 
     /* Finds a genus representative. Will throw an exception if not found. */
     const GenusRep<R,F>& find_genus_rep(QuadFormPtr q) const;
+
+    /* A filename used for importing the genus representatives. */
+    std::string genusFilename;
+
+    /* The number of threads to use when computing the genus. */
+    int64_t genusNumThreads = 0;
+
+    /* Creates the genus from a file. */
+    void import_genus(const std::string& filename);
+
+    /* Computes the full genus. */
+    void compute_genus(int64_t numThreads=0);
 
     ////////// THREADING RESOURCES
 
@@ -290,16 +305,62 @@ namespace std
 }
 
 template<typename R, typename F>
-Genus<R,F>::Genus(const QuadForm<R,F>& q)
+Genus<R,F>::Genus(const QuadForm<R,F>& q, int64_t numThreads)
 {
     this->q_ = QuadForm<R,F>::reduce(q, false);
     this->disc_ = this->q_->discriminant();
+    this->genusNumThreads = numThreads;
+}
+
+template<typename R, typename F>
+Genus<R,F>::Genus(const std::string& filename)
+{
+    // Set genus input filename.
+    this->genusFilename = filename;
+
+    // Open the genus file, so that we can read the initial quadratic form.
+    std::ifstream infile(filename.c_str(), std::ios::in);
+    if (!infile.is_open())
+    {
+        throw std::runtime_error("Unable to open input file.");
+    }
+
+    // Read the dimension. We don't need this now.
+    R temp;
+    infile >> temp;
+
+    // Read the coefficients of the initial form.
+    R a, b, c, f, g, h;
+    infile >> a >> b >> c >> f >> g >> h;
+    infile.close();
+
+    // Set the quadratic form and discriminant.
+    this->q_ = std::make_shared<QuadForm<R,F>>(a, b, c, f, g, h, true);
+    this->disc_ = this->q_->discriminant();
+}
+
+template<typename R, typename F>
+bool Genus<R,F>::computed(void) const
+{
+    return this->computed_;
 }
 
 template<typename R, typename F>
 std::shared_ptr<QuadForm<R,F>> Genus<R,F>::quad_form(void) const
 {
     return this->q_;
+}
+
+template<typename R, typename F>
+const R& Genus<R,F>::discriminant(void) const
+{
+    return this->disc_;
+}
+
+template<typename R, typename F>
+std::vector<R> Genus<R,F>::bad_primes(void) const
+{
+    return Math<R,F>::prime_divisors_naive(this->disc_);
 }
 
 template<typename R, typename F>
@@ -393,12 +454,22 @@ template<typename R, typename F>
 void Genus<R,F>::compute_genus(int64_t numThreads)
 {
     // Do nothing if the genus has already been computed.
-    if (this->computed_) { return; }
+    if (this->computed_)
+    {
+        return;
+    }
 
     // Initialize the dimensions for each character to zero.
     for (auto& chi : this->charSet_)
     {
         this->dimensionMap_[chi.conductor()] = 0;
+    }
+
+    // Read genus from file, if provided.
+    if (!this->genusFilename.empty())
+    {
+        this->import_genus(this->genusFilename);
+        return;
     }
 
     // Add the defining quadratic form as the initial genus rep.
@@ -469,6 +540,9 @@ void Genus<R,F>::compute_genus(int64_t numThreads)
             }
         }
     }
+
+    // Flag the genus as computed.
+    this->computed_ = true;
 }
 
 template<typename R, typename F>
@@ -479,13 +553,13 @@ const GenusRep<R,F>& Genus<R,F>::find_genus_rep(QuadFormPtr q) const
 }
 
 template<typename R, typename F>
-void Genus<R,F>::add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor)
+void Genus<R,F>::add_genus_rep(QuadFormPtr q, QuadFormPtr neighbor, bool force)
 {
     // Create a GenusRep object from the shared pointer.
     GenusRep<R,F> rep(q);
 
     // Is this quadratic form already in the genus? If not, add it.
-    if (this->genusReps_.count(rep) == 0)
+    if (force || this->genusReps_.count(rep) == 0)
     {
         // Compose to obtain a global isometry between this genus rep and
         // the original quadratic form.
@@ -544,6 +618,11 @@ void GenusRep<R,F>::set_dimension(const Character<R,F>& chi, int64_t dim)
 template<typename R, typename F>
 void Genus<R,F>::add_character(const Character<R,F>& chi)
 {
+    if (this->disc_ % chi.conductor() != 0)
+    {
+        throw std::runtime_error("Conductor must divide discriminant.");
+    }
+
     // If this is a new character, add it to the set.
     if (this->charSet_.count(chi) == 0)
     {
@@ -701,11 +780,16 @@ void Genus<R,F>::threaded_compute_hecke_operators(const R& p, int64_t)
 template<typename R, typename F>
 void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
 {
+    if (!this->computed_)
+    {
+        this->compute_genus(this->genusNumThreads);
+    }
+
     if (this->heckeMap_.count(p) > 0)
     {
         const std::map<R, HeckePtr> hecke = this->heckeMap_.find(p)->second;
 
-        std::cout << "Hecke operators at " << p << " already computed." << std::endl;
+        std::cerr << "Hecke operators at " << p << " already computed." << std::endl;
         return;
     }
 
@@ -932,16 +1016,36 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         throw std::runtime_error("No eigenvectors imported.");
     }
 
+    // Get the bad primes.
+    std::vector<R> badPrimes = std::move(this->bad_primes());
+
     // Initialize the eigenvalues; this will be updated as we go.
     this->eigenvalueMap_.clear();
     for (auto& it : this->eigenvectorMap_)
     {
+        const Character<R,F>& chi = it.first;
+        const R& cond = chi.conductor();
         for (Eigenvector& vec : it.second)
         {
             this->eigenvalueMap_[&vec] = std::move(std::map<R, int64_t>());
+
+            // Initialize eigenvalues at the good primes.
             for (auto& p : ps)
             {
                 this->eigenvalueMap_[&vec][p] = 0;
+            }
+
+            // Initialize eigenvalues at the bad primes.
+            for (auto& p : badPrimes)
+            {
+                if (cond % p == 0)
+                {
+                    this->eigenvalueMap_[&vec][p] = -1;
+                }
+                else
+                {
+                    this->eigenvalueMap_[&vec][p] = 1;
+                }
             }
         }
     }
@@ -1137,15 +1241,15 @@ int64_t Genus<R,F>::dimension(const R& cond) const
 }
 
 template<typename R, typename F>
-void Genus<R,F>::print(void) const
+void Genus<R,F>::print(std::ostream& os) const
 {
-    std::cout << this->genusVec_.size() << std::endl;
+    os << this->genusVec_.size() << std::endl;
     for (QuadFormPtr q : this->genusVec_)
     {
-        std::cout << q << " ";
-        std::cout << q->isometry() << std::endl;
+        os << q << " ";
+        os << q->isometry() << std::endl;
     }
-    std::cout << std::endl;
+    os << std::endl;
 
     for (auto& it1 : this->heckeMap_)
     {
@@ -1154,19 +1258,21 @@ void Genus<R,F>::print(void) const
         for (auto& it2 : charMap)
         {
             HeckePtr hecke = it2.second;
-            std::cout << it2.first << " " << p << " ";
-            hecke->print();
-            std::cout << std::endl << std::endl;
+            os << it2.first << " " << p << " ";
+            os << *hecke;
+            os << std::endl << std::endl;
         }
     }
-    std::cout << std::endl;
+    os << std::endl;
 }
 
 template<typename R, typename F>
 void Genus<R,F>::import_genus(const std::string& filename)
 {
+    // Open file stream.
     std::ifstream infile(filename.c_str(), std::ios::in);
 
+    // If the file isn't open... ¯\_(ツ)_/¯
     if (!infile.is_open())
     {
         throw std::runtime_error("Unable to open input file.");
@@ -1177,16 +1283,27 @@ void Genus<R,F>::import_genus(const std::string& filename)
 
     for (int64_t n = 0; n < dim; n++)
     {
-        mpz_class a, b, c, f, g, h;
-        mpq_class a11, a12, a13, a21, a22, a23, a31, a32, a33;
-
+        // Quadratic form coefficients.
+        R a, b, c, f, g, h;
         infile >> a >> b >> c >> f >> g >> h;
+
+        // Isometry coefficients.
+        F a11, a12, a13, a21, a22, a23, a31, a32, a33;
         infile >> a11 >> a12 >> a13 >> a21 >> a22 >> a23 >> a31 >> a32 >> a33;
 
-        QuadForm<R,F> q(a, b, c, f, g, h);
-        QuadFormPtr qq = QuadForm<R,F>::reduce(q, false);
+        // Create a quadratic form shared pointer, as well as the isometry
+        // shared pointer, assign the isometry to the quadratic form, and add
+        // it to the genus.
+        QuadFormPtr qq = std::make_shared<QuadForm<R,F>>(this->disc_, a, b, c, f, g, h, true);
         auto s = std::make_shared<Isometry<R,F>>(a11, a12, a13, a21, a22, a23, a31, a32, a33);
         qq->isometry(s);
+
+        // Set the initial quadratic form.
+        if (n == 0)
+        {
+            this->q_ = qq;
+            this->disc_ = qq->discriminant();
+        }
 
         this->add_genus_rep(qq);
     }
@@ -1195,13 +1312,37 @@ void Genus<R,F>::import_genus(const std::string& filename)
 template<typename R, typename F>
 void Genus<R,F>::import_eigenvectors(const std::string& filename)
 {
+    // Open a file stream.
     std::ifstream infile(filename.c_str(), std::ios::in);
 
+    // Can't open the file? No problem. Throw an exception!
     if (!infile.is_open())
     {
         throw std::runtime_error("Unable to open input file.");
     }
 
+    // Determine how many conductors we have, and build the associated characters.
+    int64_t numConds;
+    infile >> numConds;
+
+    // Continue reading until end of file.
+    for (int64_t n = 0; n < numConds; n++)
+    {
+        R cond;
+        infile >> cond;
+
+        // Get the primes dividing this conductor.
+        std::vector<R> ps = Math<R,F>::prime_divisors_naive(cond);
+
+        // Construct the character.
+        Character<R,F> chi(ps);
+        this->add_character(chi);
+    }
+
+    // Compute the genus.
+    this->compute_genus(this->genusNumThreads);
+
+    // Read eigenvectors from file.
     int64_t numEigenvectors = 0;
 
     R cond;
@@ -1209,28 +1350,47 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
 
     while (!infile.eof())
     {
+        // Do we have a character with this conductor?
         if (this->dimensionMap_.count(cond) == 0)
         {
             throw std::runtime_error("Eigenvector with unassociated conductor found, cannot proceed.");
         }
 
+        // Okay, let's get it, and figure out the dimension.
         const Character<R,F>& chi = this->condToChar_[cond];
-
         int64_t dim = this->dimensionMap_[cond];
 
+        // Read the eigenvector coefficients.
         Eigenvector vec(dim);
         infile >> vec;
 
+        // Set up data structure for storing eigenvector.
         if (this->eigenvectorMap_.count(chi) == 0)
         {
-            this->eigenvectorMap_[chi] = std::vector<Eigenvector>();
+            this->eigenvectorMap_[chi] = std::move(std::vector<Eigenvector>());
         }
         this->eigenvectorMap_[chi].push_back(std::move(vec));
 
+        // Read pre-computed eigenvalues.
+        // TODO: Save these values to eigenvalueMap_ so that they don't get
+        // recomputed later.
+        int64_t numPrimes;
+        infile >> numPrimes;
+        for (int64_t n = 0; n < numPrimes; n++)
+        {
+            R temp;
+            int64_t temp2;
+            infile >> temp >> temp2;
+        }
+
         ++numEigenvectors;
 
+        // Read the next conductor, or get eof flag.
         infile >> cond;
     }
+
+    // Close file stream.
+    infile.close();
 
     // Populate the absolute position vectors with zeroes.
     for (auto& it : this->eigenvectorMap_)
@@ -1283,14 +1443,54 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
         }
     }
 
+    // TODO: Add code to handle the case where there isn't a pivot allowing us
+    // to compute all eigenvalues from a single row of the Hecke operator.
     throw std::runtime_error("Multiple pivots needed. Not yet implemented.");
+}
 
-    //int64_t dim = this->genusVec_.size();
-    //for (int64_t k = 0; k < dim; k++)
-    //{
-    //    std::cout << nonzero[k] << " ";
-    //}
-    //std::cout << std::endl;
+template<typename R, typename F>
+void Genus<R,F>::export_eigenvectors(const std::string& filename)
+{
+    std::ofstream outfile(filename.c_str(), std::ios::out);
+
+    if (!outfile.is_open())
+    {
+        throw std::runtime_error("Unable to open output file for writing.");
+    }
+
+    outfile << this->eigenvectorMap_.size();
+    for (auto& it1 : this->eigenvectorMap_)
+    {
+        outfile << " " << it1.first.conductor();
+    }
+    outfile << std::endl << std::endl;
+
+    for (auto& it1 : this->eigenvectorMap_)
+    {
+        const Character<R,F>& chi = it1.first;
+        std::vector<Eigenvector>& list = it1.second;
+        for (Eigenvector& vec : list)
+        {
+            outfile << chi.conductor() << " " << vec << std::endl;
+
+            auto& eigs = this->eigenvalueMap_[&vec];
+            outfile << eigs.size();
+            for (auto& it2 : eigs)
+            {
+                outfile << " " << it2.first << " " << it2.second;
+            }
+            outfile << std::endl << std::endl;
+        }
+    }
+
+    outfile.close();
+}
+
+template<typename R, typename F>
+std::ostream& operator<<(std::ostream& os, const Genus<R,F>& genus)
+{
+    genus.print(os);
+    return os;
 }
 
 #endif // __GENUS_H_

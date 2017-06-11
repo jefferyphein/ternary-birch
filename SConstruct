@@ -11,6 +11,7 @@ srcs = Split('''
     Eigenvector.cpp
     GenusZZ.cpp
     IsometryZZ.cpp
+    MathZZ.cpp
     NeighborIteratorZZ.cpp
     QuadFormZZ.cpp
     SparseMatrix.cpp

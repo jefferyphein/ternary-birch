@@ -10,7 +10,7 @@ public:
     SparseMatrix() = default;
     SparseMatrix(int64_t rows, int64_t cols);
 
-    void print(void) const;
+    void print(std::ostream& os) const;
     void update_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
     void add_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
     int64_t num_rows(void) const;
@@ -20,5 +20,7 @@ private:
     int64_t cols_;
     std::map<int64_t, std::map<int64_t, int64_t>> data_;
 };
+
+std::ostream& operator<<(std::ostream& os, const SparseMatrix& mat);
 
 #endif // __SPARSE_MATRIX_H_

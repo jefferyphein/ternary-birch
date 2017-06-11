@@ -16,13 +16,13 @@ class QuadForm
 public:
     typedef std::shared_ptr<Isometry<R,F>> IsometryPtr;
 
-    QuadForm(const QuadForm<R,F>&) = default;
+    QuadForm(const QuadForm<R,F>& q) = default;
 
     QuadForm(const R& a, const R& b, const R& c,
-             const R& f, const R& g, const R& h);
+             const R& f, const R& g, const R& h, bool reduced=false);
     QuadForm(const R& disc,
              const R& a, const R& b, const R& c,
-             const R& f, const R& g, const R& h);
+             const R& f, const R& g, const R& h, bool reduced=false);
 
     const R& a(void) const;
     const R& b(void) const;
@@ -58,7 +58,7 @@ private:
     R a_, b_, c_, f_, g_, h_;
 
     /* The discriminant of the quadratic form. */
-    R disc_ = -1;
+    R disc_ = R(-1);
 
     /* An isometry that transforms this form to the "mother" form defined by
      * the genus to which it belongs. This is unused if this form does not get
@@ -85,20 +85,22 @@ private:
 
 template<typename R, typename F>
 QuadForm<R,F>::QuadForm(const R& a, const R& b, const R& c,
-                        const R& f, const R& g, const R& h)
+                        const R& f, const R& g, const R& h, bool reduced)
 {
     R disc = a * (4 * b * c - f * f) - b * g * g + h * (f * g - c * h);
     *this = QuadForm<R,F>(disc, a, b, c, f, g, h);
+    this->reduced_ = reduced;
 }
 
 template<typename R, typename F>
 QuadForm<R,F>::QuadForm(const R& disc,
                         const R& a, const R& b, const R& c,
-                        const R& f, const R& g, const R& h)
+                        const R& f, const R& g, const R& h, bool reduced)
 {
     this->disc_ = disc;
     this->a_ = a; this->b_ = b; this->c_ = c;
     this->f_ = f; this->g_ = g; this->h_ = h;
+    this->reduced_ = reduced;
 }
 
 template<typename R, typename F>

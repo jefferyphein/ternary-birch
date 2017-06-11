@@ -11,16 +11,16 @@ SparseMatrix::SparseMatrix(int64_t rows, int64_t cols)
     this->data_ = std::map<int64_t, std::map<int64_t, int64_t>>();
 }
 
-void SparseMatrix::print(void) const
+void SparseMatrix::print(std::ostream& os) const
 {
     for (auto& row : this->data_)
     {
-        std::cout << row.first << " " << row.second.size();
+        os << row.first << " " << row.second.size();
         for (auto& col : row.second)
         {
-            std::cout << " " << col.first << " " << col.second;
+            os << " " << col.first << " " << col.second;
         }
-        std::cout << std::endl;
+        os << std::endl;
     }
 }
 
@@ -50,4 +50,10 @@ void SparseMatrix::add_row(int64_t rowNumber,
 int64_t SparseMatrix::num_rows(void) const
 {
     return this->data_.size();
+}
+
+std::ostream& operator<<(std::ostream& os, const SparseMatrix& mat)
+{
+    mat.print(os);
+    return os;
 }

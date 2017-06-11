@@ -7,6 +7,7 @@
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
 typedef Isometry<mpz_class, mpq_class> IsometryQQ;
 typedef std::shared_ptr<IsometryQQ> IsometryQQPtr;
+typedef Math<mpz_class, mpq_class> MathZZ;
 
 template<>
 std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
@@ -513,7 +514,7 @@ std::vector<mpz_class> QuadFormZZ::isotropic_vector(const mpz_class& p) const
 {
     std::vector<mpz_class> vec(3, 0);
 
-    if (Math::gcd(this->disc_, p) != 1)
+    if (MathZZ::gcd(this->disc_, p) != 1)
     {
         throw std::runtime_error("Prime ideal is not coprime to discriminant.");
     }
@@ -565,26 +566,26 @@ std::vector<mpz_class> QuadFormZZ::isotropic_vector(const mpz_class& p) const
 
     if (v == 0)
     {
-        vec[0] = (-h * Math::modinv(2*a, p)) % p;
+        vec[0] = (-h * MathZZ::modinv(2*a, p)) % p;
         vec[1] = 1;
-        Math::fix_vector(vec, p);
+        MathZZ::fix_vector(vec, p);
         return vec;
     }
 
-    int64_t ll = Math::kronecker(v, p);
+    int64_t ll = MathZZ::kronecker(v, p);
 
 
     if (ll == 1)
     {
-        mpz_class sqr = Math::square_root(v, p);
+        mpz_class sqr = MathZZ::square_root(v, p);
 
-        mpz_class temp = Math::modinv(sqr, p);
+        mpz_class temp = MathZZ::modinv(sqr, p);
         vec[0] = (1 - h*temp) % p;
         vec[1] = (2*a*temp) % p;
 
         if (vec[0] != 0)
         {
-            mpz_class temp = Math::modinv(vec[0], p);
+            mpz_class temp = MathZZ::modinv(vec[0], p);
             vec[0] = 1;
             vec[1] = (vec[1] * temp) % p;
         }
@@ -593,13 +594,13 @@ std::vector<mpz_class> QuadFormZZ::isotropic_vector(const mpz_class& p) const
             vec[1] = 1;
         }
 
-        Math::fix_vector(vec, p);
+        MathZZ::fix_vector(vec, p);
         return vec;
     }
 
     mpz_class A = (2*a) % p;
-    mpz_class B = ((-v) * Math::modinv(2*a, p)) % p;
-    mpz_class C = ((2 * this->disc_) * Math::modinv(-v, p)) % p;
+    mpz_class B = ((-v) * MathZZ::modinv(2*a, p)) % p;
+    mpz_class C = ((2 * this->disc_) * MathZZ::modinv(-v, p)) % p;
 
     mpz_class num, x, y;
     do
@@ -612,18 +613,18 @@ std::vector<mpz_class> QuadFormZZ::isotropic_vector(const mpz_class& p) const
 
         // The value we wish to test.
         num = -(((((A * x) % p) * x) % p + (((B * y) % p) * y) % p) *
-                Math::modinv(C, p)) % p;
+                MathZZ::modinv(C, p)) % p;
     }
-    while (num == 0 || Math::kronecker(num, p) == -1);
+    while (num == 0 || MathZZ::kronecker(num, p) == -1);
 
     // Compute its square root modulo p.
-    mpz_class sqr = Math::square_root(num, p);
+    mpz_class sqr = MathZZ::square_root(num, p);
 
     // Avoid recomputing this value.
-    mpz_class temp = Math::modinv(-v, p);
+    mpz_class temp = MathZZ::modinv(-v, p);
 
     // Build the isotropic vector.
-    vec[0] = (((x - (h * y * Math::modinv(2*a, p))) % p) +
+    vec[0] = (((x - (h * y * MathZZ::modinv(2*a, p))) % p) +
               sqr * ((f * h - 2 * b * g) % p) * temp) % p;
     vec[1] = (y + sqr * (g * h - 2 * a *f) * temp) % p;
     vec[2] = sqr;
@@ -631,14 +632,14 @@ std::vector<mpz_class> QuadFormZZ::isotropic_vector(const mpz_class& p) const
     // Normalize the vector.
     if (vec[0] != 0)
     {
-        mpz_class inv = Math::modinv(vec[0], p);
+        mpz_class inv = MathZZ::modinv(vec[0], p);
         vec[0] = 1;
         vec[1] = (vec[1] * inv) % p;
         vec[2] = (vec[2] * inv) % p;
     }
     else if (vec[1] != 0)
     {
-        mpz_class inv = Math::modinv(vec[1], p);
+        mpz_class inv = MathZZ::modinv(vec[1], p);
         vec[1] = 1;
         vec[2] = (vec[2] * inv) % p;
     }
@@ -647,7 +648,7 @@ std::vector<mpz_class> QuadFormZZ::isotropic_vector(const mpz_class& p) const
         vec[2] = 1;
     }
 
-    Math::fix_vector(vec, p);
+    MathZZ::fix_vector(vec, p);
     return vec;
 }
 

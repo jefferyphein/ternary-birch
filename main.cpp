@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <gmpxx.h>
+#include <unistd.h>
 #include "QuadForm.h"
 #include "Genus.h"
 #include "Character.h"
@@ -10,81 +11,220 @@ typedef Isometry<mpz_class, mpq_class> IsometryZZ;
 typedef Genus<mpz_class, mpq_class> GenusZZ;
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
 typedef Character<mpz_class, mpq_class> CharacterZZ;
+typedef Math<mpz_class, mpq_class> MathZZ;
 
 int main(int argc, char** argv)
 {
-    mpz_class a, b, c, f, g, h;
-    std::string genfilename;
-    std::string eigfilename;
+    /*** INITIALIZATION *****************************************************/
 
-    if (argc < 9)
+    mpz_class a, b, c, f, g, h;
+    mpz_class upto = 0;
+    std::string eigfilename;
+    std::string genfilename;
+    std::string outfilename;
+    std::vector<mpz_class> conductors;
+    std::vector<mpz_class> primes;
+    bool allConductors = false;
+    bool quadformProvided = false;
+
+    /*** READ QUADRATIC FORM ARGUMENT FROM COMMAND-LINE, IF PROVIDED ********/
+
+    if (argc >= 7)
     {
-        std::cerr << "Usage:" << std::endl;
-        std::cerr << "   ./birch a b c f g h genus eigs" << std::endl;
+        bool isQuadForm = true;
+        for (int64_t n = argc-6; n < argc; n++)
+        {
+            std::string s(argv[n]);
+            if (s.empty())
+            {
+                isQuadForm = false;
+                continue;
+            }
+            int64_t pos = s[0] == '-' ? 1 : 0;
+            isQuadForm = isQuadForm && (s.substr(pos).find_first_not_of("0123456789") == std::string::npos);
+        }
+
+        if (isQuadForm)
+        {
+            // Assign quadratic form coefficients from end of parameter list.
+            a = std::atoi(argv[argc-6]);
+            b = std::atoi(argv[argc-5]);
+            c = std::atoi(argv[argc-4]);
+            f = std::atoi(argv[argc-3]);
+            g = std::atoi(argv[argc-2]);
+            h = std::atoi(argv[argc-1]);
+            argc -= 6;
+            quadformProvided = true;
+        }
+    }
+
+    /*** PARSE COMMAND-LINE ARGUMENTS ***************************************/
+
+    int cc;
+    while ((cc = getopt(argc, argv, "e:g:ac:o:p:u:")) != -1)
+    {
+        switch (cc)
+        {
+            case 'a':
+                allConductors = true;
+                break;
+            case 'c':
+                conductors.push_back(std::move(mpz_class(optarg)));
+                break;
+            case 'e':
+                eigfilename = optarg;
+                break;
+            case 'g':
+                genfilename = optarg;
+                break;
+            case 'o':
+                outfilename = optarg;
+                break;
+            case 'p':
+                primes.push_back(mpz_class(optarg));
+                break;
+            case 'u':
+                upto = mpz_class(optarg);
+                break;
+        }
+    }
+
+    /*** QUALITY CONTROL ****************************************************/
+
+    // Handle case where eigenvectors are provided, but no genus provided.
+    if (!eigfilename.empty() && genfilename.empty())
+    {
+        throw std::runtime_error("Must provide input genus file when computing eigenvalues.");
+    }
+
+    // Handle case where quadratic form and genus file both provided.
+    if (quadformProvided && !genfilename.empty())
+    {
+        throw std::runtime_error("Ambiguous input: quadratic form and genus file provided.");
+    }
+
+    // Handle case where no quadratic form input has been provided.
+    if (!quadformProvided && genfilename.empty())
+    {
+        throw std::runtime_error("No quadratic form input provided.");
+    }
+
+    /*** BUILD GENUS ********************************************************/
+
+    // Shared pointers to the genus and initial quadratic form.
+    std::shared_ptr<GenusZZ> genus;
+    std::shared_ptr<QuadFormZZ> q;
+
+    // Construct the genus.
+    if (quadformProvided)
+    {
+        q = std::make_shared<QuadFormZZ>(a, b, c, f, g, h);
+        genus = std::make_shared<GenusZZ>(*q);
     }
     else
     {
-        a = atoi(argv[1]);
-        b = atoi(argv[2]);
-        c = atoi(argv[3]);
-        f = atoi(argv[4]);
-        g = atoi(argv[5]);
-        h = atoi(argv[6]);
-
-        genfilename = argv[7];
-        eigfilename = argv[8];
+        genus = std::make_shared<GenusZZ>(genfilename);
+        q = genus->quad_form();
     }
 
-    QuadFormZZ q(a, b, c, f, g, h);
-    GenusZZ genus(q);
+    /*** BUILD CHARACTERS ***************************************************/
 
-    auto divs = Math::squarefree_divisors(q.discriminant());
-    for (auto& d : divs)
+    // Determine characters to be computed.
+    if (eigfilename.empty())
     {
-        CharacterZZ chi(d);
-        genus.add_character(chi);
+        // If no eigenvectors specified, and the all conductors flag is set,
+        // determine squarefree conductors and add their characters.
+        if (allConductors)
+        {
+            auto divs = MathZZ::squarefree_divisors(q->discriminant());
+            for (auto& d : divs)
+            {
+                CharacterZZ chi(d);
+                genus->add_character(chi);
+            }
+        }
+        else
+        {
+            // Otherwise, add conductors based upon user input.
+            for (mpz_class& cond : conductors)
+            {
+                std::vector<mpz_class> ps = MathZZ::prime_divisors_naive(cond);
+                CharacterZZ chi(ps);
+                genus->add_character(chi);
+            }
+
+            // If no user specified conductors, add the trivial character.
+            if (conductors.empty())
+            {
+                CharacterZZ chi(1);
+                genus->add_character(chi);
+            }
+        }
+    }
+    else
+    {
+        // If eigenvector file specified, import them. This will implicitly
+        // build characters based on the conductors of the eigenvectors being
+        // loaded. User input conductors will be ignored to avoid unnecessary
+        // computations.
+        genus->import_eigenvectors(eigfilename);
     }
 
-    //genus.compute_genus(0);
-    //genus.compute_hecke_operators(2, 8);
-    //genus.compute_hecke_operators(3, 8);
-    //genus.compute_hecke_operators(5, 8);
-    //genus.compute_hecke_operators(7, 8);
-    //genus.compute_hecke_operators(101, 8);
-    genus.import_genus(genfilename);
-    genus.import_eigenvectors(eigfilename);
+    /*** ASSIGN PRIMES IF WE'RE COMPUTING UP TO A LIMIT *********************/
 
-    std::vector<mpz_class> ps = {
-           2,    3,    5,    7,   29,   31,   37,   41,   43,   47,
-          53,   59,   61,   67,   71,   73,   79,   83,   89,   97,
-         101,  103,  107,  109,  113,  127,  131,  137,  139,  149,
-         151,  157,  163,  167,  173,  179,  181,  191,  193,  197,
-         199,  211,  223,  227,  229,  233,  239,  241,  251,  257,
-         263,  269,  271,  277,  281,  283,  293,  307,  311,  313,
-         317,  331,  337,  347,  349,  353,  359,  367,  373,  379,
-         383,  389,  397,  401,  409,  419,  421,  431,  433,  439,
-         443,  449,  457,  461,  463,  467,  479,  487,  491,  499,
-         503,  509,  521,  523,  541,  547,  557,  563,  569,  571,
-         577,  587,  593,  599,  601,  607,  613,  617,  619,  631,
-         641,  643,  647,  653,  659,  661,  673,  677,  683,  691,
-         701,  709,  719,  727,  733,  739,  743,  751,  757,  761,
-         769,  773,  787,  797,  809,  811,  821,  823,  827,  829,
-         839,  853,  857,  859,  863,  877,  881,  883,  887,  907,
-         911,  919,  929,  937,  941,  947,  953,  967,  971,  977,
-         983,  991,  997, 1009, 1013, 1019, 1021, 1031, 1033, 1039,
-        1049, 1051, 1061, 1063, 1069, 1087, 1091, 1093, 1097, 1103,
-        1109, 1117, 1123, 1129, 1151, 1153, 1163, 1171, 1181, 1187,
-        1193, 1201, 1213, 1217, 1223
-    };
+    if (upto > 0)
+    {
+        primes = std::move(MathZZ::prime_up_to(upto, genus->discriminant()));
+    }
 
-    genus.compute_eigenvalues(ps, 8);
+    /*** EITHER COMPUTE HECKE OPERATORS OR HECKE EIGENVALUES ****************/
 
-    //genus.compute_hecke_operators(2, 8);
-    //genus.compute_hecke_operators(3, 8);
-    //genus.compute_hecke_operators(5, 8);
-    //genus.compute_hecke_operators(7, 8);
+    if (eigfilename.empty())
+    {
+        // If no eigenvector file specified, we're going to compute Hecke
+        // operators instead.
+        for (auto& p : primes)
+        {
+            genus->compute_hecke_operators(p, 8);
+        }
+    }
+    else
+    {
+        // If eigenvector file specified, let's compute Hecke eigenvalues.
+        genus->compute_eigenvalues(primes, 8);
+    }
 
-    //genus.print();
-    
+    /*** SAVE GENUS DATA ****************************************************/
+
+    if (outfilename.empty())
+    {
+        // If no output filename was specified, and the genus was actually
+        // computed, print the genus to stdout.
+        if (genus->computed())
+        {
+            std::cout << *genus;
+        }
+    }
+    else
+    {
+        // Otherwise, print the genus to the specified file.
+        std::fstream f(outfilename, std::ios::out);
+        if (!f.is_open())
+        {
+            std::cout << *genus;
+            throw std::runtime_error("Unable to open output file.");
+        }
+
+        f << *genus;
+        f.close();
+    }
+
+    /*** SAVE HECKE EIGENVALUE DATA *****************************************/
+
+    if (!eigfilename.empty())
+    {
+        genus->export_eigenvectors(eigfilename);
+    }
+
     return EXIT_SUCCESS;
 }

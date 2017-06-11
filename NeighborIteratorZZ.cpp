@@ -10,6 +10,7 @@ typedef NeighborIterator<mpz_class, mpq_class> NeighborIteratorZZ;
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
 typedef ChangeOfBasis<mpz_class, mpq_class> ChangeOfBasisZZ;
 typedef Isometry<mpz_class, mpq_class> IsometryQQ;
+typedef Math<mpz_class, mpq_class> MathZZ;
 
 template<>
 NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_class& p)
@@ -31,7 +32,7 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
     this->s_ = std::make_shared<ChangeOfBasisZZ>(p);
 
     // Normalize the initial isotropic vector.
-    Math::normalize_vector(this->isotropicVector_, this->p_);
+    MathZZ::normalize_vector(this->isotropicVector_, this->p_);
 
     /* Our goal at this point is to build a p-standard basis which can then
      * be utilized to help us construct all of the p-neighbors of the attached
@@ -119,7 +120,7 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
 #endif
 
     // Scalar to make (h % p) == 0.
-    mpz_class scalar = (-h * Math::modinv(g, p)) % p;
+    mpz_class scalar = (-h * MathZZ::modinv(g, p)) % p;
 
     if (p != 2)
     {
@@ -145,7 +146,7 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
     this->s_->a22 = (this->s_->a22 + this->s_->a23 * scalar) % p;
     this->s_->a32 = (this->s_->a32 + this->s_->a33 * scalar) % p;
 
-    mpz_class ginv = Math::modinv(g, p);
+    mpz_class ginv = MathZZ::modinv(g, p);
     this->s_->a12 = (this->s_->a12 - this->s_->a11 * f * ginv) % p;
     this->s_->a22 = (this->s_->a22 - this->s_->a21 * f * ginv) % p;
     this->s_->a32 = (this->s_->a32 - this->s_->a31 * f * ginv) % p;
@@ -170,8 +171,8 @@ const std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector
 
     // Normalize the isotropic vector modulo p, then adjust its coefficients
     // so that their absolute value is as small as possible.
-    Math::normalize_vector(vec, this->p_);
-    Math::fix_vector(vec, this->p_);
+    MathZZ::normalize_vector(vec, this->p_);
+    MathZZ::fix_vector(vec, this->p_);
 
     // The coefficients of the p-neighbor.
     mpz_class a, b, c, f, g, h;
@@ -272,7 +273,7 @@ const std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector
     }
 
     // Scalar to make (h % p) == 0.
-    mpz_class scalar = (-h * Math::modinv(g, this->p_)) % this->p_;
+    mpz_class scalar = (-h * MathZZ::modinv(g, this->p_)) % this->p_;
 
     if (this->p_ != 2)
     {
@@ -302,7 +303,7 @@ const std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector
     mpz_class pp = this->p_*this->p_;
 
     // Scalar to make (a % pp) == 0.
-    scalar = (-a * Math::modinv(g, pp)) % pp;
+    scalar = (-a * MathZZ::modinv(g, pp)) % pp;
 
     if (this->p_ != 2)
     {

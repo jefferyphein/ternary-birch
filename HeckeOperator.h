@@ -13,7 +13,7 @@ class HeckeOperator
 public:
     HeckeOperator() = default;
     HeckeOperator(const Genus<R,F>& genus, const Character<R,F>& chi);
-    void print(void) const;
+    void print(std::ostream& os) const;
     void update_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
     void add_row(int64_t rowNumber, const std::map<int64_t, int64_t>& theRow);
     int64_t num_rows(void) const;
@@ -31,10 +31,10 @@ HeckeOperator<R,F>::HeckeOperator(const Genus<R,F>& genus, const Character<R,F>&
 }
 
 template<typename R, typename F>
-void HeckeOperator<R,F>::print(void) const
+void HeckeOperator<R,F>::print(std::ostream& os) const
 {
-    std::cout << this->m_.num_rows() << " " << this->dim_ << std::endl;
-    this->m_.print();
+    os << this->m_.num_rows() << " " << this->dim_ << std::endl;
+    os << this->m_;
 }
 
 template<typename R, typename F>
@@ -53,6 +53,13 @@ template<typename R, typename F>
 int64_t HeckeOperator<R,F>::num_rows(void) const
 {
     return this->m_.num_rows();
+}
+
+template<typename R, typename F>
+std::ostream& operator<<(std::ostream& os, const HeckeOperator<R,F>& hecke)
+{
+    hecke.print(os);
+    return os;
 }
 
 #endif // __HECKE_OPERATOR_H_

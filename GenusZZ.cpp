@@ -7,6 +7,7 @@ typedef Genus<mpz_class, mpq_class> GenusZZ;
 typedef GenusRep<mpz_class, mpq_class> GenusRepZZ;
 typedef Character<mpz_class, mpq_class> CharacterZZ;
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
+typedef Math<mpz_class, mpq_class> MathZZ;
 
 template<>
 mpz_class GenusZZ::smallest_good_prime(void) const
@@ -20,7 +21,7 @@ mpz_class GenusZZ::smallest_good_prime(void) const
 
     mpz_class p = 3;
 
-    while (Math::gcd(d, p) != 1) { p += 2; }
+    while (MathZZ::gcd(d, p) != 1) { p += 2; }
 
     return p;
 }

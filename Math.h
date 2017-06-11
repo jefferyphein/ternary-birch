@@ -4,207 +4,22 @@
 #include <cmath>
 #include <gmpxx.h>
 
+template<typename R, typename F>
 class Math
 {
 public:
-    static mpz_class gcd(const mpz_class& a, const mpz_class& b)
-    {
-        mpz_class g;
-        mpz_gcd(g.get_mpz_t(), a.get_mpz_t(), b.get_mpz_t());
-        return g;
-    }
-
-    static mpz_class pow(const mpz_class& a, const mpz_class& e, const mpz_class& p)
-    {
-        if (e == 0) { return 1; }
-
-        if (e < 0) { return Math::modinv(Math::pow(a, -e, p), p); }
-
-        // Handle the even power case.
-        if ((e & 1) == 0)
-        {
-            mpz_class v = Math::pow(a, e/2, p);
-            return mpz_class((v * v) % p);
-        }
-
-        // Handle the odd power case.
-        mpz_class v = Math::pow(a, (e-1)/2, p);
-        return mpz_class((a * ((v * v) % p)) % p);
-    }
-
-    static mpz_class modinv(const mpz_class& a, const mpz_class& p)
-    {
-        mpz_class g;
-        mpz_class s;
-        mpz_class t;
-        mpz_gcdext(g.get_mpz_t(), s.get_mpz_t(), t.get_mpz_t(), a.get_mpz_t(), p.get_mpz_t());
-        return s;
-    }
-
-    static void fix_vector(std::vector<mpz_class>& vec, const mpz_class& p)
-    {
-        for (mpz_class& x : vec)
-        {
-            if (p == 2 && x != 0) { x = 1; }
-            else if (x > (p-1)/2) { x -= p; }
-            else if (-x > (p-1)/2) { x += p; }
-        }
-    }
-
-    static void normalize_vector(std::vector<mpz_class>& vec, const mpz_class& p)
-    {
-        if (vec.size() != 3)
-        {
-            throw std::runtime_error("Vector must be three-dimensional.");
-        }
-
-        if (vec[0] != 0)
-        {
-            mpz_class inv = Math::modinv(vec[0], p);
-            vec[0] = 1;
-            vec[1] = (vec[1] * inv) % p;
-            vec[2] = (vec[2] * inv) % p;
-        }
-        else if (vec[1] != 0)
-        {
-            mpz_class inv = Math::modinv(vec[1], p);
-            vec[1] = 1;
-            vec[2] = (vec[2] * inv) % p;
-        }
-        else
-        {
-            vec[2] = 1;
-        }
-    }
-
-    static int64_t kronecker(const mpz_class& a, const mpz_class& b)
-    {
-        return static_cast<int64_t>(mpz_kronecker(a.get_mpz_t(), b.get_mpz_t()));
-    }
-
-    static mpz_class square_root(mpz_class a, const mpz_class& p)
-    {
-        // Make a positive.
-        a = a % p; if (a < 0) { a += p; }
-
-        // Check the obvious case.
-        if (a == 1) { return 1; }
-        if (a == 0) { return 0; }
-
-        // Set up the Tonelli-Shanks algorithm.
-        mpz_class Q = p-1;
-        mpz_class S = 0;
-        while (Q % 2 == 0) { Q /= 2; S++; }
-
-        // If S == 1, i.e. p = 3 (mod 4), then we have a solution!
-        if (S == 1) { return Math::pow(a, (p+1)/4, p); }
-
-        // Need to pick a quadratic nonresidue, we do so randomly.
-        mpz_class z = -1;
-        do { z = 1 + (rand() % (p-1)); }
-        while (Math::kronecker(z, p) == 1);
-
-        // The Tonelli-Shanks algrithm follows.
-
-        mpz_class c = Math::pow(z, Q, p);
-        mpz_class R = Math::pow(a, (Q+1)/2, p);
-        mpz_class t = Math::pow(a, Q, p);
-        mpz_class M = S;
-
-        while (true)
-        {
-            if (t == 1) { return R; }
-            mpz_class i = 0;
-            mpz_class t1 = t;
-            while (t1 != 1) { t1 = (t1 * t1) % p; i++; }
-
-            mpz_class _pow = 1;
-            mpz_class j; for (j = 0; j < M-i-1; j++) { _pow *= 2; }
-            mpz_class b = Math::pow(c, _pow, p) % p;
-            R = (R * b) % p;
-            t = (t * b * b) % p;
-            c = (b * b) % p;
-            M = i;
-        }
-
-        // Make the compiler happy.
-        return 0;
-    }
-
-    static int64_t valuation(mpq_class x, mpz_class p)
-    {
-        mpz_class num = x.get_num();
-        if (num == 0) { return 0; }
-
-        mpz_class den = x.get_den();
-        if (num == 0) { return 0; }
-
-        int64_t count = 0;
-        while (num % p == 0) { ++count; num /= p; }
-        while (den % p == 0) { --count; den /= p; }
-        return count;
-    }
-
-    static std::vector<mpz_class> prime_divisors_naive(mpz_class n)
-    {
-        std::vector<mpz_class> ps;
-
-        while (n % 2 == 0)
-        {
-            ps.push_back(2);
-            do
-            {
-                n /= 2;
-            }
-            while (n % 2 == 0);
-        }
-
-        mpz_class upper = sqrt(n);
-        for (mpz_class p = 3; p <= upper; p += 2)
-        {
-            if (n % p == 0)
-            {
-                ps.push_back(p);
-                do
-                {
-                    n /= p;
-                }
-                while (n % p == 0);
-            }
-            upper = sqrt(n);
-        }
-
-        if (n != 1)
-        {
-            ps.push_back(n);
-        }
-
-        return ps;
-    }
-
-    static std::vector<mpz_class> prime_divisors(mpz_class n)
-    {
-        return Math::prime_divisors_naive(n);
-    }
-
-    static std::vector<std::vector<mpz_class>> squarefree_divisors(mpz_class n)
-    {
-        std::vector<mpz_class> ps = Math::prime_divisors(n);
-        std::vector<std::vector<mpz_class>> divs(1, std::vector<mpz_class>());
-
-        for (auto& p : ps)
-        {
-            size_t m = divs.size();
-            for (size_t k = 0; k < m; k++)
-            {
-                auto vec = divs[k];
-                vec.push_back(p);
-                divs.push_back(vec);
-            }
-        }
-
-        return divs;
-    }
+    static R gcd(const R& a, const R& b);
+    static R pow(const R& a, const R& e, const R& p);
+    static R modinv(const R& a, const R& p);
+    static void fix_vector(std::vector<R>& vec, const R& p);
+    static void normalize_vector(std::vector<R>& vec, const R& p);
+    static int64_t kronecker(const R& a, const R& b);
+    static R square_root(R a, const R& p);
+    static int64_t valuation(F x, R p);
+    static std::vector<R> prime_divisors_naive(R n);
+    static std::vector<R> prime_divisors(const R& n);
+    static std::vector<std::vector<R>> squarefree_divisors(const R& n);
+    static std::vector<R> prime_up_to(const R& upTo, const R& coprimeTo);
 };
 
 #endif // __MATH_H_

@@ -3,6 +3,7 @@
 
 #include "Isometry.h"
 #include "QuadForm.h"
+#include "Math.h"
 
 template<typename R, typename F>
 class Character
@@ -38,9 +39,7 @@ template<typename R, typename F>
 Character<R,F>::Character(const R& cond)
 {
     this->cond_ = cond;
-
-    // TODO: ADD A FACTORIZATION METHOD HERE.
-    this->ps_ = std::vector<R>(1, cond);
+    this->ps_ = std::move(Math<R,F>::prime_divisors_naive(cond));
 }
 
 template<typename R, typename F>
