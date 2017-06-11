@@ -26,6 +26,8 @@ int main(int argc, char** argv)
     std::vector<mpz_class> primes;
     bool allConductors = false;
     bool quadformProvided = false;
+    int64_t numThreads = 0;
+    int64_t maxThreads = std::thread::hardware_concurrency();
 
     /*** READ QUADRATIC FORM ARGUMENT FROM COMMAND-LINE, IF PROVIDED ********/
 
@@ -61,7 +63,7 @@ int main(int argc, char** argv)
     /*** PARSE COMMAND-LINE ARGUMENTS ***************************************/
 
     int cc;
-    while ((cc = getopt(argc, argv, "e:g:ac:o:p:u:")) != -1)
+    while ((cc = getopt(argc, argv, "e:i:ac:o:p:u:j:x")) != -1)
     {
         switch (cc)
         {
@@ -74,8 +76,19 @@ int main(int argc, char** argv)
             case 'e':
                 eigfilename = optarg;
                 break;
-            case 'g':
+            case 'i':
                 genfilename = optarg;
+                break;
+            case 'j':
+                numThreads = std::atoi(optarg);
+                if (numThreads < 0)
+                {
+                    numThreads = 0;
+                }
+                else if (numThreads > maxThreads)
+                {
+                    numThreads = maxThreads;
+                }
                 break;
             case 'o':
                 outfilename = optarg;
@@ -85,6 +98,9 @@ int main(int argc, char** argv)
                 break;
             case 'u':
                 upto = mpz_class(optarg);
+                break;
+            case 'x':
+                numThreads = maxThreads;
                 break;
         }
     }
@@ -119,7 +135,7 @@ int main(int argc, char** argv)
     if (quadformProvided)
     {
         q = std::make_shared<QuadFormZZ>(a, b, c, f, g, h);
-        genus = std::make_shared<GenusZZ>(*q);
+        genus = std::make_shared<GenusZZ>(*q, numThreads);
     }
     else
     {
@@ -185,13 +201,13 @@ int main(int argc, char** argv)
         // operators instead.
         for (auto& p : primes)
         {
-            genus->compute_hecke_operators(p, 8);
+            genus->compute_hecke_operators(p, numThreads);
         }
     }
     else
     {
         // If eigenvector file specified, let's compute Hecke eigenvalues.
-        genus->compute_eigenvalues(primes, 8);
+        genus->compute_eigenvalues(primes, numThreads);
     }
 
     /*** SAVE GENUS DATA ****************************************************/

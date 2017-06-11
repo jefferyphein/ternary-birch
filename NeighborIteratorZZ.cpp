@@ -195,11 +195,11 @@ const std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector
 
         // Update coefficients.
         a = this->q_->a() +
-            this->q_->b() * u * u +
-            this->q_->c() * v * v +
-            this->q_->f() * u * v +
-            this->q_->g() * v +
-            this->q_->h() * u;
+            u * (this->q_->b() * u + 
+                 this->q_->f() * v +
+                 this->q_->h()) +
+            v * (this->q_->c() * v +
+                 this->q_->g());
         b = this->q_->b();
         c = this->q_->c();
         f = this->q_->f();
@@ -226,8 +226,8 @@ const std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector
 
         // Update coefficients.
         a = this->q_->b() +
-            this->q_->c() * u * u +
-            this->q_->f() * u;
+            u * (this->q_->c() * u +
+                 this->q_->f());
         b = this->q_->a();
         c = this->q_->c();
         f = this->q_->g();
@@ -428,4 +428,10 @@ std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::get_neighbor(int64_t pos) const
 #endif
 
     return this->build_neighbor(vec);
+}
+
+template<>
+int64_t NeighborIteratorZZ::num_neighbors(const mpz_class& p)
+{
+    return mpz_get_si(p.get_mpz_t()) + 1;
 }

@@ -12,6 +12,7 @@ public:
     NeighborIterator(std::shared_ptr<QuadForm<R,F>> q, const R& p);
 
     inline int64_t num_neighbors(void) const;
+    static int64_t num_neighbors(const R& p);
     inline const mpz_class& prime(void) const;
 
     std::shared_ptr<QuadForm<R,F>> get_neighbor(int64_t pos) const;
