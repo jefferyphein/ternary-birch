@@ -209,6 +209,9 @@ private:
     /* A two-dimensional map that stores eigenvalues associated to Eigenvector
      * pointers and prime values. */
     std::map<int64_t, std::map<R, int64_t>> eigenvalueMap_;
+
+    /* A map of pivots used for each eigenvector. */
+    std::map<int64_t, int64_t> pivotMap_;
 };
 
 template<typename R, typename F>
@@ -952,6 +955,9 @@ void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<int64_t, std
         const R& p = this->eigenvalueNeighborVec_[itIndex].prime();
         int64_t N = nIndex - boundaries[itIndex];
 
+        // The source quadratic form.
+        QuadFormPtr src = this->eigenvalueNeighborVec_[itIndex].quad_form();
+
         // Get the p-neighhor, reduce it, and identify its associated
         // genus rep.
         QuadFormPtr neighbor = this->eigenvalueNeighborVec_[itIndex].get_neighbor(N);
@@ -970,7 +976,11 @@ void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<int64_t, std
             for (auto& vec : it.second)
             {
                 if (vec[relPos] == 0) { continue; }
-                needed = true;
+                int64_t pivot = this->pivotMap_[vec.index()];
+                if (*src == *this->genusVec_[pivot])
+                {
+                    needed = true;
+                }
             }
         }
 
@@ -1027,7 +1037,12 @@ void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<int64_t, std
             // Update local eigenvalues.
             for (Eigenvector& vec : it.second)
             {
-                values[vec.index()][p] += (vec[pos] * value);
+                int64_t pivot = this->pivotMap_[vec.index()];
+                QuadFormPtr q = this->genusVec_[pivot];
+                if (*q == *src)
+                {
+                    values[vec.index()][p] += (vec[pos] * value);
+                }
             }
         }
     }
@@ -1097,12 +1112,6 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         }
     }
 
-    // Retrieve the pivot we'll use, get its quadratic form and associated
-    // genus rep.
-    int64_t pivot = this->eigenvectorPivots_[0];
-    QuadFormPtr q = this->genusVec_[pivot];
-    const GenusRep<R,F>& g = this->find_genus_rep(q);
-
     if (numThreads > 0)
     {
         // Assign the shared neighbor iterator.
@@ -1111,7 +1120,11 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         {
             if (needToCompute[index])
             {
-                this->eigenvalueNeighborVec_.push_back(std::move(NeighborIterator<R,F>(q, p)));
+                for (int64_t pivot : this->eigenvectorPivots_)
+                {
+                    QuadFormPtr q = this->genusVec_[pivot];
+                    this->eigenvalueNeighborVec_.push_back(std::move(NeighborIterator<R,F>(q, p)));
+                }
             }
             ++index;
         }
@@ -1164,90 +1177,106 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                 continue;
             }
 
-            // Build the neighbor iterator and let's get started.
-            NeighborIterator<R,F> it(q, p);
-            QuadFormPtr neighbor = it.next_neighbor();
-    
-            while (neighbor != nullptr)
+            for (int64_t pivot : this->eigenvectorPivots_)
             {
-                QuadFormPtr reduced = QuadForm<R,F>::reduce(*neighbor);
-                const GenusRep<R,F>& rep = this->find_genus_rep(reduced);
-        
-                // Determine whether we actually need to compute anything for this
-                // p-neighbor.
-                bool needed = false;
-                for (auto& it : this->eigenvectorMap_)
+                QuadFormPtr q = this->genusVec_[pivot];
+                //const GenusRep<R,F>& g = this->find_genus_rep(q);
+
+                // Build the neighbor iterator and let's get started.
+                NeighborIterator<R,F> it(q, p);
+                QuadFormPtr neighbor = it.next_neighbor();
+    
+                while (neighbor != nullptr)
                 {
-                    const R& cond = it.first.conductor();
-                    int64_t relPos = rep.position(cond);
-                    if (relPos == -1) { continue; }
+                    QuadFormPtr reduced = QuadForm<R,F>::reduce(*neighbor);
+                    const GenusRep<R,F>& rep = this->find_genus_rep(reduced);
         
-                    for (auto& vec : it.second)
+                    // Determine whether we actually need to compute anything for this
+                    // p-neighbor.
+                    bool needed = false;
+                    for (auto& it : this->eigenvectorMap_)
                     {
-                        if (vec[relPos] == 0) { continue; }
-                        needed = true;
-                    }
-                }
+                        const R& cond = it.first.conductor();
+                        int64_t relPos = rep.position(cond);
+                        if (relPos == -1) { continue; }
         
-                // If we don't need to compute anything, get the next neighbor and
-                // continue.
-                if (!needed)
-                {
+                        for (auto& vec : it.second)
+                        {
+                            if (vec[relPos] == 0) { continue; }
+                            int64_t vecPivot = this->pivotMap_[vec.index()];
+                            if (*q == *this->genusVec_[vecPivot])
+                            {
+                                needed = true;
+                            }
+                        }
+                    }
+        
+                    // If we don't need to compute anything, get the next neighbor and
+                    // continue.
+                    if (!needed)
+                    {
+                        neighbor = it.next_neighbor();
+                        continue;
+                    }
+        
+                    // Multiply the p-neighbor isometry on the right by the reduction
+                    // isometry. This now represents an isometry from the original
+                    // quadratic form to the genus representative isometric to this
+                    // p-neighbor.
+                    neighbor->isometry()->multiply_on_right_by(reduced->isometry());
+                
+#ifdef DEBUG    
+                    assert( neighbor->isometry()->is_isometry(*this->q_, *rep.quad_form()) );
+#endif
+                
+                    // Obtain an automorphism of the original quadratic form.
+                    neighbor->isometry()->multiply_on_right_by(rep.inverse());
+                
+#ifdef DEBUG    
+                    assert( neighbor->isometry()->is_automorphism(*this->q_) );
+#endif
+                
+                    // Convenient reference for the automorphism we'll use.
+                    std::shared_ptr<Isometry<R,F>> aut = neighbor->isometry();
+        
+                    // Compute the character value for each of the primitive characters.
+                    std::map<R,int64_t> primeValues;
+                    for (const Character<R,F>& chi : this->primeCharSet_)
+                    {
+                        primeValues[chi.conductor()] = chi.rho(*aut, *this->q_);
+                    }
+        
+                    for (auto& it : this->eigenvectorMap_)
+                    {
+                        // Get the character and the relative position of this genus rep
+                        // with respect to the character. If the p-neighbor we computed
+                        // doesn't contribute to this eigenvector, skip it.
+                        const Character<R,F>& chi = it.first;
+                        int64_t repPos = rep.position(chi);
+                        if (repPos == -1) { continue; }
+        
+                        // Compute the value of this character.
+                        int64_t value = 1;
+                        for (const R& p : chi.primes())
+                        {
+                            value *= primeValues[p];
+                        }
+        
+                        // Loop over the eigenvectors associated to this character.
+                        for (auto& vec : it.second)
+                        {
+                            if (vec[repPos] == 0) { continue; }
+
+                            int64_t pivot = this->pivotMap_[vec.index()];
+                            if (*q == *this->genusVec_[pivot])
+                            {
+                                this->eigenvalueMap_[vec.index()][p] += (vec[repPos] * value);
+                            }
+                        }
+                    }
+        
                     neighbor = it.next_neighbor();
-                    continue;
                 }
-        
-                // Multiply the p-neighbor isometry on the right by the reduction
-                // isometry. This now represents an isometry from the original
-                // quadratic form to the genus representative isometric to this
-                // p-neighbor.
-                neighbor->isometry()->multiply_on_right_by(reduced->isometry());
-            
-#ifdef DEBUG
-                assert( neighbor->isometry()->is_isometry(*this->q_, *rep.quad_form()) );
-#endif
-            
-                // Obtain an automorphism of the original quadratic form.
-                neighbor->isometry()->multiply_on_right_by(rep.inverse());
-            
-#ifdef DEBUG
-                assert( neighbor->isometry()->is_automorphism(*this->q_) );
-#endif
-            
-                // Convenient reference for the automorphism we'll use.
-                std::shared_ptr<Isometry<R,F>> aut = neighbor->isometry();
-        
-                // Compute the character value for each of the primitive characters.
-                std::map<R,int64_t> primeValues;
-                for (const Character<R,F>& chi : this->primeCharSet_)
-                {
-                    primeValues[chi.conductor()] = chi.rho(*aut, *this->q_);
-                }
-        
-                for (auto& it : this->eigenvectorMap_)
-                {
-                    // Get the character and the relative position of this genus rep
-                    // with respect to the character. If the p-neighbor we computed
-                    // doesn't contribute to this eigenvector, skip it.
-                    const Character<R,F>& chi = it.first;
-                    int64_t repPos = rep.position(chi);
-                    if (repPos == -1) { continue; }
-        
-                    // Compute the value of this character.
-                    int64_t value = 1;
-                    for (const R& p : chi.primes())
-                    {
-                        value *= primeValues[p];
-                    }
-        
-                    // Loop over the eigenvectors associated to this character.
-                    for (auto& vec : it.second)
-                    {
-                        this->eigenvalueMap_[vec.index()][p] += (vec[repPos] * value);
-                    }
-                }
-        
-                neighbor = it.next_neighbor();
             }
             ++index;
         }
@@ -1261,13 +1290,21 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         // Update the eigenvalues.
         for (auto& vec : it.second)
         {
+            int64_t pivot = this->pivotMap_[vec.index()];
+            QuadFormPtr q = this->genusVec_[pivot];
+            const GenusRep<R,F>& g = this->find_genus_rep(q);
             int64_t relPos = g.position(chi);
+            int64_t index = 0;
             for (const R& p : ps)
             {
+                if (needToCompute[index])
+                {
 #ifdef DEBUG
-                assert( this->eigenvalueMap_[vec.index()][p] % vec[relPos] == 0 );
+                    assert( this->eigenvalueMap_[vec.index()][p] % vec[relPos] == 0 );
 #endif
-                this->eigenvalueMap_[vec.index()][p] /= vec[relPos];
+                    this->eigenvalueMap_[vec.index()][p] /= vec[relPos];
+                }
+                ++index;
             }
         }
     }
@@ -1494,7 +1531,7 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
     for (auto& it : this->eigenvectorMap_)
     {
         const R& cond = it.first.conductor();
-        this->absolutePosition_[cond] = std::vector<int64_t>(this->dimension(cond), 0);
+        this->absolutePosition_[cond] = std::vector<int64_t>(this->dimension(cond), -1);
     }
 
     // Populate the absolute position.
@@ -1513,37 +1550,102 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
         }
     }
 
-    // A vector containing the number of nonzero entries at each absolute
-    // position across all eigenvectors. This will be used to identify which
-    // genus rep(s) will be used to compute eigenvalues.
-    std::vector<int64_t> nonzero(this->genusVec_.size(), 0);
+    // A vector which will be populated with eigenvector pivots. These
+    // correspond to the row of the Hecke operator which needs to be computed
+    // in order to generate all eigenvalue for all eigenvectors.
+    this->eigenvectorPivots_ = std::move(std::vector<int64_t>());
 
-    for (auto& it : this->eigenvectorMap_)
+    // An unordered map of the eigenvector indices which are known to be
+    // accounted for by the eigenvectorPivots_ vector.
+    std::unordered_set<int64_t> accountedFor;
+
+    // The number of eigenvectors we hope to account for during this iteration.
+    int64_t goal = numEigenvectors;
+
+    while (accountedFor.size() < numEigenvectors)
     {
-        const R& cond = it.first.conductor();
-        const std::vector<int64_t>& absPos = this->absolutePosition_[cond];
-        for (auto& vec : it.second)
+        // A vector containing the number of nonzero entries at each absolute
+        // position across all eigenvectors. This will be used to identify which
+        // genus rep(s) will be used to compute eigenvalues.
+        std::vector<int64_t> nonzero(this->genusVec_.size(), 0);
+
+        for (auto& it : this->eigenvectorMap_)
         {
-            const auto& coeffs = vec.coefficients();
-            int64_t len = coeffs.size();
-            for (int64_t k = 0; k < len; k++)
+            const R& cond = it.first.conductor();
+            const std::vector<int64_t>& absPos = this->absolutePosition_[cond];
+            for (auto& vec : it.second)
             {
-                if (coeffs[k] != 0)
+                if (accountedFor.count(vec.index()) > 0) { continue; }
+
+                const auto& coeffs = vec.coefficients();
+                int64_t len = coeffs.size();
+                for (int64_t k = 0; k < len; k++)
                 {
-                    ++nonzero[absPos[k]];
-                    if (nonzero[absPos[k]] == numEigenvectors)
+                    if (coeffs[k] != 0)
                     {
-                        this->eigenvectorPivots_ = std::vector<int64_t>(1, absPos[k]);
-                        return;
+                        ++nonzero[absPos[k]];
+                        if (nonzero[absPos[k]] == goal)
+                        {
+                            // Push the pivot onto the vector.
+                            this->eigenvectorPivots_.push_back(absPos[k]);
+
+                            // Assign this pivot to all remaining vectors.
+                            for (int64_t n = 0; n < numEigenvectors; n++)
+                            {
+                                if (accountedFor.count(n) == 0)
+                                {
+                                    this->pivotMap_[n] = absPos[k];
+                                }
+                            }
+                            return;
+                        }
                     }
                 }
             }
         }
-    }
 
-    // TODO: Add code to handle the case where there isn't a pivot allowing us
-    // to compute all eigenvalues from a single row of the Hecke operator.
-    throw std::runtime_error("Multiple pivots needed. Not yet implemented.");
+        // Determine the best (greedy) pivot position to include.
+        auto maxelt = std::max_element(nonzero.begin(), nonzero.end());
+        int64_t bestIndex = std::distance(nonzero.begin(), maxelt);
+        QuadFormPtr qq = this->genusVec_[bestIndex];
+        const GenusRep<R,F>& rep = this->find_genus_rep(qq);
+
+        for (auto& it : this->eigenvectorMap_)
+        {
+            const R& cond = it.first.conductor();
+
+            int64_t relPos = rep.position(cond);
+
+            for (auto& vec : it.second)
+            {
+                // Skip this vector if it has already been assigned a pivot.
+                if (accountedFor.count(vec.index()) > 0)
+                {
+                    continue;
+                }
+
+                // Skip this vector if the character does not allow it to be
+                // accounted for.
+                if (relPos == -1)
+                {
+                    continue;
+                }
+
+                // If the vector has a nonzero value in the best position, add
+                // it to the accounted for set.
+                if (vec[relPos] != 0)
+                {
+                    accountedFor.insert(vec.index());
+                    this->pivotMap_[vec.index()] = bestIndex;
+                }
+            }
+        }
+
+        // Add this pivot to the list.
+        this->eigenvectorPivots_.push_back(bestIndex);
+
+        goal = numEigenvectors - accountedFor.size();
+    }
 }
 
 template<typename R, typename F>
