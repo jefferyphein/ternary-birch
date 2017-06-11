@@ -228,8 +228,8 @@ std::vector<mpz_class> MathZZ::primes_up_to(const mpz_class& upTo, const mpz_cla
 
     // Create the prime list.
     std::vector<mpz_class> primes;
-    if (N >= 2) { primes.push_back(2); }
-    if (N >= 3) { primes.push_back(3); }
+    if (N >= 2 && coprimeTo % 2 != 0) { primes.push_back(2); }
+    if (N >= 3 && coprimeTo % 3 != 0) { primes.push_back(3); }
     if (N < 4) { return primes; }
 
     // Initialize vector to start the sieve.
@@ -243,7 +243,7 @@ std::vector<mpz_class> MathZZ::primes_up_to(const mpz_class& upTo, const mpz_cla
     {
         if (isPrime[k/3])
         {
-            if (MathZZ::gcd(k, coprimeTo) == 1)
+            if (MathZZ::gcd(k, coprimeTo) == abs(1))
             {
                 primes.push_back(k);
             }

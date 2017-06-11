@@ -1076,11 +1076,6 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         }
     }
 
-    //for (int64_t n = 0; n < needToCompute.size(); n++)
-    //{
-    //    std::cout << needToCompute[n] << std::endl;
-    //}
-
     // Retrieve the pivot we'll use, get its quadratic form and associated
     // genus rep.
     int64_t pivot = this->eigenvectorPivots_[0];
