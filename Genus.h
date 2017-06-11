@@ -137,7 +137,7 @@ private:
     void threaded_compute_hecke_operators(const R& p, int64_t threadid);
 
     /* This function is passed to threads, accesses p-neighbors, and computes eigenvalues. */
-    void threaded_compute_eigenvalues(std::promise<std::map<Eigenvector*, std::map<R, int64_t>>>& aps);
+    void threaded_compute_eigenvalues(std::promise<std::map<int64_t, std::map<R, int64_t>>>& aps);
 
     /* A vector of booleans used to determine whether a thread is blocked due
      * to there being no objects in the genusQueue_. */
@@ -208,7 +208,7 @@ private:
 
     /* A two-dimensional map that stores eigenvalues associated to Eigenvector
      * pointers and prime values. */
-    std::map<Eigenvector*, std::map<R, int64_t>> eigenvalueMap_;
+    std::map<int64_t, std::map<R, int64_t>> eigenvalueMap_;
 };
 
 template<typename R, typename F>
@@ -326,7 +326,7 @@ Genus<R,F>::Genus(const std::string& filename)
     }
 
     // Read the dimension. We don't need this now.
-    R temp;
+    int64_t temp;
     infile >> temp;
 
     // Read the coefficients of the initial form.
@@ -862,17 +862,17 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
 }
 
 template<typename R, typename F>
-void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<Eigenvector*, std::map<R, int64_t>>>& aps)
+void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<int64_t, std::map<R, int64_t>>>& aps)
 {
     // Initialize running eigenvalue tallies.
-    std::map<Eigenvector*, std::map<R, int64_t>> values;
+    std::map<int64_t, std::map<R, int64_t>> values;
     for (auto& it : this->eigenvectorMap_)
     {
         for (Eigenvector& vec : it.second)
         {
             for (NeighborIterator<R,F>& neighborIt : this->eigenvalueNeighborVec_)
             {
-                values[&vec][neighborIt.prime()] = 0;
+                values[vec.index()][neighborIt.prime()] = 0;
             }
         }
     }
@@ -994,7 +994,7 @@ void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<Eigenvector*
             // Update local eigenvalues.
             for (Eigenvector& vec : it.second)
             {
-                values[&vec][p] += (vec[pos] * value);
+                values[vec.index()][p] += (vec[pos] * value);
             }
         }
     }
@@ -1019,20 +1019,34 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
     // Get the bad primes.
     std::vector<R> badPrimes = std::move(this->bad_primes());
 
+    // A vector of flags indicating whether we actually need to compute its
+    // associated prime.
+    std::vector<bool> needToCompute(ps.size(), false);
+
     // Initialize the eigenvalues; this will be updated as we go.
-    this->eigenvalueMap_.clear();
     for (auto& it : this->eigenvectorMap_)
     {
         const Character<R,F>& chi = it.first;
         const R& cond = chi.conductor();
         for (Eigenvector& vec : it.second)
         {
-            this->eigenvalueMap_[&vec] = std::move(std::map<R, int64_t>());
+            // Create map of prime/eigenvalue pairs.
+            if (this->eigenvalueMap_.count(vec.index()) == 0)
+            {
+                this->eigenvalueMap_[vec.index()] = std::move(std::map<R, int64_t>());
+            }
+            std::map<R, int64_t>& tempMap = this->eigenvalueMap_[vec.index()];
 
-            // Initialize eigenvalues at the good primes.
+            // Initialize eigenvalues at the good primes, if necessary.
+            int64_t index = 0;
             for (auto& p : ps)
             {
-                this->eigenvalueMap_[&vec][p] = 0;
+                if (tempMap.count(p) == 0)
+                {
+                    tempMap[p] = 0;
+                    needToCompute[index] = true;
+                }
+                ++index;
             }
 
             // Initialize eigenvalues at the bad primes.
@@ -1040,15 +1054,20 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
             {
                 if (cond % p == 0)
                 {
-                    this->eigenvalueMap_[&vec][p] = -1;
+                    tempMap[p] = -1;
                 }
                 else
                 {
-                    this->eigenvalueMap_[&vec][p] = 1;
+                    tempMap[p] = 1;
                 }
             }
         }
     }
+
+    //for (int64_t n = 0; n < needToCompute.size(); n++)
+    //{
+    //    std::cout << needToCompute[n] << std::endl;
+    //}
 
     // Retrieve the pivot we'll use, get its quadratic form and associated
     // genus rep.
@@ -1059,16 +1078,21 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
     if (numThreads > 0)
     {
         // Assign the shared neighbor iterator.
+        int64_t index = 0;
         for (auto& p : ps)
         {
-            this->eigenvalueNeighborVec_.push_back(std::move(NeighborIterator<R,F>(q, p)));
+            if (needToCompute[index])
+            {
+                this->eigenvalueNeighborVec_.push_back(std::move(NeighborIterator<R,F>(q, p)));
+            }
+            ++index;
         }
 
         // Initialize the neighbor index.
         this->neighborIndex_.store(0);
 
         // Create promises.
-        std::vector<std::promise<std::map<Eigenvector*, std::map<R, int64_t>>>> aps(numThreads);
+        std::vector<std::promise<std::map<int64_t, std::map<R, int64_t>>>> aps(numThreads);
 
         // Create the threads.
         std::vector<std::thread> threads;
@@ -1091,19 +1115,27 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
             auto eigenvalues = aps[n].get_future().get();
             for (auto& it1 : eigenvalues)
             {
-                Eigenvector* vec = it1.first;
+                int64_t index = it1.first;
                 for (auto& it2 : it1.second)
                 {
                     const R& p = it2.first;
-                    this->eigenvalueMap_[vec][p] += it2.second;
+                    this->eigenvalueMap_[index][p] += it2.second;
                 }
             }
         }
     }
     else
     {
+        int64_t index = 0;
         for (const R& p : ps)
         {
+            // Skip this prime if we don't need to compute it for any of the
+            // eigenvectors.
+            if (!needToCompute[index])
+            {
+                continue;
+            }
+
             // Build the neighbor iterator and let's get started.
             NeighborIterator<R,F> it(q, p);
             QuadFormPtr neighbor = it.next_neighbor();
@@ -1170,8 +1202,8 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                     // with respect to the character. If the p-neighbor we computed
                     // doesn't contribute to this eigenvector, skip it.
                     const Character<R,F>& chi = it.first;
-                    int64_t pos = rep.position(chi);
-                    if (pos == -1) { continue; }
+                    int64_t repPos = rep.position(chi);
+                    if (repPos == -1) { continue; }
         
                     // Compute the value of this character.
                     int64_t value = 1;
@@ -1183,13 +1215,13 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                     // Loop over the eigenvectors associated to this character.
                     for (auto& vec : it.second)
                     {
-                        //aps[&vec] += (vec[pos] * value);
-                        this->eigenvalueMap_[&vec][p] += (vec[pos] * value);
+                        this->eigenvalueMap_[vec.index()][p] += (vec[repPos] * value);
                     }
                 }
         
                 neighbor = it.next_neighbor();
             }
+            ++index;
         }
     }
     
@@ -1205,9 +1237,9 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
             for (const R& p : ps)
             {
 #ifdef DEBUG
-                assert( this->eigenvalueMap_[&vec][p] % vec[relPos] == 0 );
+                assert( this->eigenvalueMap_[vec.index()][p] % vec[relPos] == 0 );
 #endif
-                this->eigenvalueMap_[&vec][p] /= vec[relPos];
+                this->eigenvalueMap_[vec.index()][p] /= vec[relPos];
             }
         }
     }
@@ -1361,15 +1393,20 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
         int64_t dim = this->dimensionMap_[cond];
 
         // Read the eigenvector coefficients.
-        Eigenvector vec(dim);
+        Eigenvector vec(dim, numEigenvectors);
         infile >> vec;
 
-        // Set up data structure for storing eigenvector.
+        // Set up data structure for storing eigenvectors.
         if (this->eigenvectorMap_.count(chi) == 0)
         {
             this->eigenvectorMap_[chi] = std::move(std::vector<Eigenvector>());
         }
         this->eigenvectorMap_[chi].push_back(std::move(vec));
+        //int64_t index = this->eigenvectorMap_[chi].size()-1;
+        //Eigenvector& eigenvector = this->eigenvectorMap_[chi][index];
+
+        // Set up data structure for storing eigenvalues.
+        this->eigenvalueMap_[numEigenvectors] = std::map<R, int64_t>();
 
         // Read pre-computed eigenvalues.
         // TODO: Save these values to eigenvalueMap_ so that they don't get
@@ -1378,9 +1415,10 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
         infile >> numPrimes;
         for (int64_t n = 0; n < numPrimes; n++)
         {
-            R temp;
-            int64_t temp2;
-            infile >> temp >> temp2;
+            R p;
+            int64_t ap;
+            infile >> p >> ap;
+            this->eigenvalueMap_[numEigenvectors][p] = ap;
         }
 
         ++numEigenvectors;
@@ -1473,7 +1511,7 @@ void Genus<R,F>::export_eigenvectors(const std::string& filename)
         {
             outfile << chi.conductor() << " " << vec << std::endl;
 
-            auto& eigs = this->eigenvalueMap_[&vec];
+            auto& eigs = this->eigenvalueMap_[vec.index()];
             outfile << eigs.size();
             for (auto& it2 : eigs)
             {
