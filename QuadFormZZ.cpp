@@ -13,12 +13,12 @@ template<>
 std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                                                bool saveIsometry)
 {
-    mpz_class a = q.a();
-    mpz_class b = q.b();
-    mpz_class c = q.c();
-    mpz_class f = q.f();
-    mpz_class g = q.g();
-    mpz_class h = q.h();
+    mpz_class a = q.a_;
+    mpz_class b = q.b_;
+    mpz_class c = q.c_;
+    mpz_class f = q.f_;
+    mpz_class g = q.g_;
+    mpz_class h = q.h_;
 
     auto s = std::make_shared<IsometryQQ>(true);
 
