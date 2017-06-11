@@ -19,7 +19,7 @@ public:
     static std::vector<R> prime_divisors_naive(R n);
     static std::vector<R> prime_divisors(const R& n);
     static std::vector<std::vector<R>> squarefree_divisors(const R& n);
-    static std::vector<R> prime_up_to(const R& upTo, const R& coprimeTo);
+    static std::vector<R> primes_up_to(const R& upTo, const R& coprimeTo);
 };
 
 #endif // __MATH_H_

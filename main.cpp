@@ -136,7 +136,7 @@ int main(int argc, char** argv)
         // determine squarefree conductors and add their characters.
         if (allConductors)
         {
-            auto divs = MathZZ::squarefree_divisors(q->discriminant());
+            auto divs = std::move(MathZZ::squarefree_divisors(q->discriminant()));
             for (auto& d : divs)
             {
                 CharacterZZ chi(d);
@@ -148,7 +148,7 @@ int main(int argc, char** argv)
             // Otherwise, add conductors based upon user input.
             for (mpz_class& cond : conductors)
             {
-                std::vector<mpz_class> ps = MathZZ::prime_divisors_naive(cond);
+                std::vector<mpz_class> ps = std::move(MathZZ::prime_divisors_naive(cond));
                 CharacterZZ chi(ps);
                 genus->add_character(chi);
             }
@@ -174,7 +174,7 @@ int main(int argc, char** argv)
 
     if (upto > 0)
     {
-        primes = std::move(MathZZ::prime_up_to(upto, genus->discriminant()));
+        primes = std::move(MathZZ::primes_up_to(upto, genus->discriminant()));
     }
 
     /*** EITHER COMPUTE HECKE OPERATORS OR HECKE EIGENVALUES ****************/
