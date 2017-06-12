@@ -1,6 +1,7 @@
 #ifndef __QUAD_FORM_H_
 #define __QUAD_FORM_H_
 
+#include <vector>
 #include <memory>
 #include <iomanip>
 #include <gmpxx.h>

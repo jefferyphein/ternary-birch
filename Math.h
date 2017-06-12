@@ -1,6 +1,7 @@
 #ifndef __MATH_H_
 #define __MATH_H_
 
+#include <vector>
 #include <cmath>
 #include <gmpxx.h>
 

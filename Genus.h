@@ -14,6 +14,7 @@
 #include <fstream>
 #include <future>
 #include <atomic>
+#include <random>
 #include "QuadForm.h"
 #include "NeighborIterator.h"
 #include "Character.h"
