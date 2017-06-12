@@ -257,3 +257,21 @@ std::vector<mpz_class> MathZZ::primes_up_to(const mpz_class& upTo, const mpz_cla
 
     return primes;
 }
+
+template<>
+bool MathZZ::is_squarefree(const mpz_class& x)
+{
+    std::vector<mpz_class> primes = std::move(MathZZ::prime_divisors_naive(x));
+    mpz_class prod = 1;
+    for (const mpz_class& p : primes)
+    {
+        prod *= p;
+    }
+    return prod == x;
+}
+
+template<>
+bool MathZZ::is_positive(const mpz_class& x)
+{
+    return abs(x) == x;
+}

@@ -312,6 +312,17 @@ Genus<R,F>::Genus(const QuadForm<R,F>& q, int64_t numThreads)
 {
     this->q_ = QuadForm<R,F>::reduce(q, false);
     this->disc_ = this->q_->discriminant();
+
+    if (!Math<R,F>::is_squarefree(this->disc_))
+    {
+        throw std::runtime_error("Discriminant must be squarefree.");
+    }
+
+    if (!Math<R,F>::is_positive(this->disc_))
+    {
+        throw std::runtime_error("Discriminant must be positive.");
+    }
+
     this->genusNumThreads = numThreads;
 }
 
@@ -1391,6 +1402,16 @@ void Genus<R,F>::import_genus(const std::string& filename)
         {
             this->q_ = qq;
             this->disc_ = qq->discriminant();
+
+            if (!Math<R,F>::is_squarefree(this->disc_))
+            {
+                throw std::runtime_error("Discriminant must be squarefree.");
+            }
+
+            if (!Math<R,F>::is_positive(this->disc_))
+            {
+                throw std::runtime_error("Discriminant must be positive.");
+            }
         }
 
         this->add_genus_rep(qq);

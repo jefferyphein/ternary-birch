@@ -20,6 +20,8 @@ public:
     static std::vector<R> prime_divisors(const R& n);
     static std::vector<std::vector<R>> squarefree_divisors(const R& n);
     static std::vector<R> primes_up_to(const R& upTo, const R& coprimeTo);
+    static bool is_squarefree(const R& x);
+    static bool is_positive(const R& x);
 };
 
 #endif // __MATH_H_
