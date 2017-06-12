@@ -26,6 +26,8 @@ int main(int argc, char** argv)
     std::vector<mpz_class> primes;
     bool allConductors = false;
     bool quadformProvided = false;
+    bool helpMessage = false;
+    bool helpMessageLong = false;
     int64_t numThreads = 0;
     int64_t maxThreads = std::thread::hardware_concurrency();
 
@@ -63,7 +65,7 @@ int main(int argc, char** argv)
     /*** PARSE COMMAND-LINE ARGUMENTS ***************************************/
 
     int cc;
-    while ((cc = getopt(argc, argv, "e:i:ac:o:p:u:j:x")) != -1)
+    while ((cc = getopt(argc, argv, "he:i:ac:o:p:u:j:x")) != -1)
     {
         switch (cc)
         {
@@ -75,6 +77,13 @@ int main(int argc, char** argv)
                 break;
             case 'e':
                 eigfilename = optarg;
+                break;
+            case 'h':
+                if (helpMessage)
+                {
+                    helpMessageLong = true;
+                }
+                helpMessage = true;
                 break;
             case 'i':
                 genfilename = optarg;
@@ -103,6 +112,72 @@ int main(int argc, char** argv)
                 numThreads = maxThreads;
                 break;
         }
+    }
+
+    /*** DISPLAY HELP MESSAGE IF REQUESTED **********************************/
+
+    if (helpMessage || helpMessageLong)
+    {
+        std::cout << "Usage: birch [-h[h]] [-x] [-a] [[-c conductor] ...] "
+                     "[[-p prime] ...]" << std::endl
+                  << "             [-i infile] [-o outfile] [-e eigfile] "
+                     "[-j threads] [-u upto]" << std::endl
+                  << "             [a b c f g h]" << std::endl;
+
+        std::cout << "Computes the the genus, Hecke operators, and Hecke eigenvalues of integral" << std::endl;
+        std::cout << "ternary quadratic forms with shape" << std::endl;
+        std::cout << "        ax^2 + by^2 + cz^2 + fyz + gxz + hxy" << std::endl << std::endl;
+ 
+        std::cout << "Options:" << std::endl;
+        std::cout << "  -a       attach a character for each squarefree divisor of the discriminant" << std::endl;
+        std::cout << "  -c N     attach a character with conductor N" << std::endl;
+        std::cout << "  -e FILE  read eigenvector data from FILE" << std::endl;
+        std::cout << "  -h       display this message" << std::endl;
+        std::cout << "  -hh      displays a longer help message" << std::endl;
+        std::cout << "  -i FILE  read genus data from FILE" << std::endl;
+        std::cout << "  -j N     launch N threads when performing computations" << std::endl;
+        std::cout << "  -o FILE  save genus and Hecke operator data to FILE" << std::endl;
+        std::cout << "  -p N     compute Hecke operator or eigenvalues at N; must be a prime" << std::endl;
+        std::cout << "  -u N     compute Hecke operators or eigenvalues for all primes <= N" << std::endl;
+        std::cout << "  -x       launch the maximum number of threads supported by the system" << std::endl;
+        std::cout << std::endl;
+
+        if (helpMessageLong)
+        {
+            std::cout << "Examples:" << std::endl;
+            std::cout << "(1) compute the genus and all Hecke operators at p=2,3" << std::endl;
+            std::cout << "       birch -a -o 85085.txt -p 2 -p 3 1 130 172 -65 -1 0" << std::endl << std::endl;
+            std::cout << "(2) compute Hecke operator at p=29 after loading data from saved genus file" << std::endl;
+            std::cout << "       birch -a -i 85085.txt -o 85085.txt -p 29" << std::endl << std::endl;
+            std::cout << "(3) compute the first 1000 Hecke eigenvalues for all eigenvectors loaded from a file" << std::endl;
+            std::cout << "       birch -i 85085.txt -e 85085-eigs.txt -u 1000" << std::endl << std::endl;
+            std::cout << "(4) compute the first 1000 Hecke eigenvalues using maximum threads" << std::endl;
+            std::cout << "       birch -x -i 85085.txt -e 85085-eigs.txt -u 1000" << std::endl;
+            std::cout << std::endl;
+
+            std::cout << "Notes:" << std::endl;
+            std::cout << "- Eigenvector files should have the following format:" << std::endl << std::endl;
+            std::cout << "     M [conductor 1] [conductor 2] ... [conductor M]" << std::endl << std::endl;
+            std::cout << "     [vector conductor] [vector coefficients relative to genus reps in genus file]" << std::endl;
+            std::cout << "     [num coefficients] [prime 1] [value 1] [prime 2] [value 2] ... [prime N] [value N]" << std::endl;
+            std::cout << "     ...repeated for each eigenvector..." << std::endl << std::endl;
+
+            std::cout << "  For example," << std::endl << std::endl;
+            std::cout << "     2 1 30" << std::endl << std::endl;
+            std::cout << "     1 3 -1" << std::endl;
+            std::cout << "     6 2 1 3 1 5 1 7 1 11 -4 13 -2" << std::endl << std::endl; 
+            std::cout << "     30 1" << std::endl;
+            std::cout << "     6 2 -1 3 -1 5 -1 7 1 11 -4 13 -2" << std::endl;
+            std::cout << std::endl;
+
+            std::cout << "  This builds two characters with conductors 1 and 30, then reads two" << std::endl;
+            std::cout << "  eigenvectors associated to these conductors, providing their coordinates, and" << std::endl;
+            std::cout << "   a few of their Hecke eigenvalues." << std::endl << std::endl;
+
+            std::cout << " - An eigenvector file must be accompanied by a genus files." << std::endl << std::endl;
+        }
+
+        return EXIT_SUCCESS;
     }
 
     /*** QUALITY CONTROL ****************************************************/

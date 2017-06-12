@@ -800,21 +800,6 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
         this->compute_genus(this->genusNumThreads);
     }
 
-    //if (this->heckeMap_.count(p) > 0)
-    //{
-    //    const std::map<R, HeckePtr> hecke = this->heckeMap_.find(p)->second;
-
-    //    std::cerr << "Hecke operators at " << p << " already computed." << std::endl;
-    //    return;
-    //}
-
-    // Build a Hecke operator map based on character conductors.
-    //this->heckeMap_[p] = std::map<R, HeckePtr>();
-    //for (auto& chi : this->charSet_)
-    //{
-    //    this->heckeMap_[p][chi.conductor()] = std::make_shared<HeckeOperator<R,F>>(*this, chi);
-    //}
-
     bool needToCompute = false;
     for (auto& chi : this->charSet_)
     {
@@ -891,7 +876,11 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
             for (auto& chi : this->charSet_)
             {
                 const R& cond = chi.conductor();
-                this->heckeMap_[cond][p]->add_row(rep.position(chi), rowMap[cond]);
+                int64_t pos = rep.position(chi);
+                if (pos != -1)
+                {
+                    this->heckeMap_[cond][p]->add_row(rep.position(chi), rowMap[cond]);
+                }
             }
         }
     }
@@ -1425,7 +1414,7 @@ void Genus<R,F>::import_genus(const std::string& filename)
     while (!infile.eof())
     {
         // Create shared pointer to Hecke operator.
-        std::shared_ptr<HeckeOperator<R,F>> hecke = std::make_shared<HeckeOperator<R,F>>();
+        std::shared_ptr<HeckeOperator<R,F>> hecke = std::make_shared<HeckeOperator<R,F>>(*this, chi);
 
         // Import values into Hecke operator.
         hecke->import(infile);
