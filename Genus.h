@@ -532,7 +532,7 @@ void Genus<R,F>::compute_genus(int64_t numThreads)
     else
     {
         // Loop over all genus representatives as the genus is built.
-        int64_t index = 0;
+        size_t index = 0;
         while (index < this->genusVec_.size())
         {
             // The current genus representative.
@@ -748,7 +748,7 @@ void Genus<R,F>::threaded_compute_hecke_operators(const R& p, int64_t)
     {
         // Obtain the mutex and determine the index of the genus rep this
         // thread should process.
-        int64_t index = this->genusVecIndex_++;
+        size_t index = this->genusVecIndex_++;
 
         // Have we reached the end of the genus vector?
         if (index >= this->genusVec_.size())
@@ -1482,7 +1482,7 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
     this->compute_genus(this->genusNumThreads);
 
     // Read eigenvectors from file.
-    int64_t numEigenvectors = 0;
+    size_t numEigenvectors = 0;
 
     R cond;
     infile >> cond;
@@ -1600,7 +1600,7 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
                             this->eigenvectorPivots_.push_back(absPos[k]);
 
                             // Assign this pivot to all remaining vectors.
-                            for (int64_t n = 0; n < numEigenvectors; n++)
+                            for (size_t n = 0; n < numEigenvectors; n++)
                             {
                                 if (accountedFor.count(n) == 0)
                                 {
