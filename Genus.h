@@ -180,7 +180,7 @@ private:
     std::map<R, Character<R,F>> condToChar_;
 
     /* A set of prime characters to compute. When representation
-     * values are compuated for characters in charSet_, these will first be
+     * values are computed for characters in charSet_, these will first be
      * computed and then multiplied together to obtain the desired
      * representation value. */
     std::set<Character<R,F>> primeCharSet_;
@@ -196,6 +196,10 @@ private:
                                 std::map<R, std::map<int64_t, int64_t>>& rowMap);
 
     ////////// EIGENVECTOR RESOURCES
+
+    /* A function used to compute the pivots used for computing eigenvalues.
+     * This is an implementation of a greedy algorithm. */
+    void assign_eigenvector_pivots_greedy(void);
 
     /* A map of Eigenvectors, associated by conductors. */
     std::map<Character<R,F>, std::vector<Eigenvector>> eigenvectorMap_;
@@ -1065,6 +1069,22 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         throw std::runtime_error("No eigenvectors imported.");
     }
 
+    if (this->eigenvectorPivots_.empty())
+    {
+
+        // Assign eigenvector pivots. The goal of this method is to identify a
+        // set of genus representatives for which we need to compute
+        // p-neighbors in order to compute all eigenvalues for all
+        // eigenvectors. This is a nontrivial problem and is equivalent to the
+        // covering set problem which is NP-complete (thanks to Gonzalo
+        // Tornaria for pointing this out). We have separated this out as its
+        // own method so that alternative algorithms can be designed and
+        // called based upon criteria such as the number of vectors, how many
+        // coordinates they have, the number of eigenvalues to be computed,
+        // their size, etc.
+        this->assign_eigenvector_pivots_greedy();
+    }
+
     // Get the bad primes.
     std::vector<R> badPrimes = std::move(this->bad_primes());
 
@@ -1560,7 +1580,11 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
             }
         }
     }
+}
 
+template<typename R, typename F>
+void Genus<R,F>::assign_eigenvector_pivots_greedy(void)
+{
     // A vector which will be populated with eigenvector pivots. These
     // correspond to the row of the Hecke operator which needs to be computed
     // in order to generate all eigenvalue for all eigenvectors.
@@ -1569,6 +1593,9 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
     // An unordered map of the eigenvector indices which are known to be
     // accounted for by the eigenvectorPivots_ vector.
     std::unordered_set<int64_t> accountedFor;
+
+    // The total number of eigenvectors.
+    size_t numEigenvectors = this->eigenvalueMap_.size();
 
     // The number of eigenvectors we hope to account for during this iteration.
     int64_t goal = numEigenvectors;
@@ -1655,6 +1682,7 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
         // Add this pivot to the list.
         this->eigenvectorPivots_.push_back(bestIndex);
 
+        // Update the goal.
         goal = numEigenvectors - accountedFor.size();
     }
 }
