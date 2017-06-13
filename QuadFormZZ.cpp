@@ -306,7 +306,6 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
         flag = !(abs(f) <= b && abs(g) <= a && abs(h) <= a && a+b+f+g+h >= 0);
     }
     
-    
     if (a+b+f+g+h == 0 && a+a+g+g+h > 0)
     {
         if (saveIsometry)
@@ -484,7 +483,6 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
         
         // apply the isometry.
         g.swap(f);
-printf("t\n");
     }
 
 #ifdef DEBUG

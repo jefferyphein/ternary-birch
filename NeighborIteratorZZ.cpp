@@ -53,11 +53,11 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
         this->s_->a33 = 1;
 
         a = (this->q_->a() +
-             this->q_->b() * u * u +
-             this->q_->c() * v * v +
-             this->q_->f() * u * v +
-             this->q_->g() * v +
-             this->q_->h() * u) % p;
+            u * (this->q_->b() * u +
+                 this->q_->f() * v +
+                 this->q_->h()) +
+            v * (this->q_->c() * v +
+                 this->q_->g())) % p;
         b = this->q_->b() % p;
         c = this->q_->c() % p;
         f = this->q_->f() % p;
@@ -78,8 +78,8 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
         this->s_->a33 = 1;
 
         a = (this->q_->b() +
-             this->q_->c() * u * u +
-             this->q_->f() * u) % p;
+             u * (this->q_->c() * u +
+                  this->q_->f())) % p;
         b = this->q_->a() % p;
         c = this->q_->c() % p;
         f = this->q_->g() % p;

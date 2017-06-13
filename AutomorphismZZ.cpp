@@ -10,7 +10,7 @@ typedef std::shared_ptr<IsometryQQ> IsometryQQPtr;
 //  assigned according to the row major enumeration of the coefficients of the
 //  automorphism. In this case, an "N" corresponds to the coefficient -1, where
 //  "0" and "1" are assigned consistently with the value of the coefficient.
-// This is not a complete list of automorphisms, as each automorhism listed
+// This is not a complete list of automorphisms, as each automorphism listed
 //  here has determinant +1. This is intentional, since automorphism groups on
 //  O(3) always contain -I where I is the identity matrix. As such, when
 //  computing the automorphism group of a quadratic form, not only does each
