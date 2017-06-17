@@ -1193,7 +1193,7 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         {
             // Skip this prime if we don't need to compute it for any of the
             // eigenvectors.
-            if (!needToCompute[index])
+            if (!needToCompute[index++])
             {
                 continue;
             }
@@ -1299,7 +1299,6 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                     neighbor = it.next_neighbor();
                 }
             }
-            ++index;
         }
     }
     
