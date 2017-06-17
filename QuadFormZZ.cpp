@@ -13,24 +13,34 @@ template<>
 std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                                                bool saveIsometry)
 {
-    mpz_class a = q.a_;
-    mpz_class b = q.b_;
-    mpz_class c = q.c_;
-    mpz_class f = q.f_;
-    mpz_class g = q.g_;
-    mpz_class h = q.h_;
+    int64_t a = mpz_get_si(q.a_.get_mpz_t());
+    int64_t b = mpz_get_si(q.b_.get_mpz_t());
+    int64_t c = mpz_get_si(q.c_.get_mpz_t());
+    int64_t f = mpz_get_si(q.f_.get_mpz_t());
+    int64_t g = mpz_get_si(q.g_.get_mpz_t());
+    int64_t h = mpz_get_si(q.h_.get_mpz_t());
 
-    auto s = std::make_shared<IsometryQQ>(true);
+    //std::cout << a << " " << b << " " << c << " " << f << " " << g << " " << h << std::endl;
+
+    int64_t a11 = 1;
+    int64_t a12 = 0;
+    int64_t a13 = 0;
+    int64_t a21 = 0;
+    int64_t a22 = 1;
+    int64_t a23 = 0;
+    int64_t a31 = 0;
+    int64_t a32 = 0;
+    int64_t a33 = 1;
 
     // flag controlling the initial reduction loop.
     bool flag = true;
     
     // temporary variable.
-    mpq_class temp;
+    int64_t temp;
     
     while (flag)
     {
-        mpz_class t = a + b + f + g + h;
+        int64_t t = a + b + f + g + h;
         if (t < 0)
         {
             if (saveIsometry)
@@ -39,9 +49,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                 // |  1  0  1 |
                 // |  0  1  1 |
                 // |  0  0  1 |
-                s->a13 += (s->a11 + s->a12);
-                s->a23 += (s->a21 + s->a22);
-                s->a33 += (s->a31 + s->a32);
+                a13 += (a11 + a12);
+                a23 += (a21 + a22);
+                a33 += (a31 + a32);
             }
             
             // apply the isometry.
@@ -60,9 +70,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                 // |  1  t  0 |
                 // |  0  1  0 |
                 // |  0  0  1 |
-                s->a12 += t * s->a11;
-                s->a22 += t * s->a21;
-                s->a32 += t * s->a31;
+                a12 += t * a11;
+                a22 += t * a21;
+                a32 += t * a31;
             }
 
             // apply the isometry.
@@ -83,9 +93,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                 // |  1  0  0 |
                 // |  0  1  t |
                 // |  0  0  1 |
-                s->a13 += t * s->a12;
-                s->a23 += t * s->a22;
-                s->a33 += t * s->a32;
+                a13 += t * a12;
+                a23 += t * a22;
+                a33 += t * a32;
             }
 
             // apply the isometry.
@@ -106,9 +116,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                 // |  1  0  t |
                 // |  0  1  0 |
                 // |  0  0  1 |
-                s->a13 += t * s->a11;
-                s->a23 += t * s->a21;
-                s->a33 += t * s->a31;
+                a13 += t * a11;
+                a23 += t * a21;
+                a33 += t * a31;
             }
 
             // apply the isometry.
@@ -125,14 +135,16 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                 // |  0 -1  0 |
                 // | -1  0  0 |
                 // |  0  0 -1 |
-                temp = s->a11; s->a11 = -s->a12; s->a12 = -temp; s->a13 = -s->a13;
-                temp = s->a21; s->a21 = -s->a22; s->a22 = -temp; s->a23 = -s->a23;
-                temp = s->a31; s->a31 = -s->a32; s->a32 = -temp; s->a33 = -s->a33;
+                temp = a11; a11 = -a12; a12 = -temp; a13 = -a13;
+                temp = a21; a21 = -a22; a22 = -temp; a23 = -a23;
+                temp = a31; a31 = -a32; a32 = -temp; a33 = -a33;
             }
             
             // apply the isometry.
-            a.swap(b);
-            f.swap(g);
+            std::swap(a, b);
+            std::swap(f, g);
+            //a.swap(b);
+            //f.swap(g);
         }
         
         if (b > c || (b == c && abs(g) > abs(h)))
@@ -143,14 +155,16 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                 // | -1  0  0 |
                 // |  0  0 -1 |
                 // |  0 -1  0 |
-                temp = s->a12; s->a12 = -s->a13; s->a13 = -temp; s->a11 = -s->a11;
-                temp = s->a22; s->a22 = -s->a23; s->a23 = -temp; s->a21 = -s->a21;
-                temp = s->a32; s->a32 = -s->a33; s->a33 = -temp; s->a31 = -s->a31;
+                temp = a12; a12 = -a13; a13 = -temp; a11 = -a11;
+                temp = a22; a22 = -a23; a23 = -temp; a21 = -a21;
+                temp = a32; a32 = -a33; a33 = -temp; a31 = -a31;
             }
             
             // apply the isometry.
-            b.swap(c);
-            g.swap(h);
+            std::swap(b, c);
+            std::swap(g, h);
+            //b.swap(c);
+            //g.swap(h);
         }
         
         if (a > b || (a == b && abs(f) > abs(g)))
@@ -161,14 +175,16 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                 // |  0 -1  0 |
                 // | -1  0  0 |
                 // |  0  0 -1 |
-                temp = s->a11; s->a11 = -s->a12; s->a12 = -temp; s->a13 = -s->a13;
-                temp = s->a21; s->a21 = -s->a22; s->a22 = -temp; s->a23 = -s->a23;
-                temp = s->a31; s->a31 = -s->a32; s->a32 = -temp; s->a33 = -s->a33;
+                temp = a11; a11 = -a12; a12 = -temp; a13 = -a13;
+                temp = a21; a21 = -a22; a22 = -temp; a23 = -a23;
+                temp = a31; a31 = -a32; a32 = -temp; a33 = -a33;
             }
             
             // apply the isometry.
-            a.swap(b);
-            f.swap(g);
+            std::swap(a, b);
+            std::swap(f, g);
+            //a.swap(b);
+            //f.swap(g);
         }
         
         if (f * g * h > 0)
@@ -186,9 +202,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                     // | -1  0  0 |
                     // |  0  1  0 |
                     // |  0  0  1 |
-                    s->a11 = -s->a11;
-                    s->a21 = -s->a21;
-                    s->a31 = -s->a31;
+                    a11 = -a11;
+                    a21 = -a21;
+                    a31 = -a31;
                 }
                 
                 // negate f.
@@ -202,9 +218,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                     // |  1  0  0 |
                     // |  0 -1  0 |
                     // |  0  0  1 |
-                    s->a12 = -s->a12;
-                    s->a22 = -s->a22;
-                    s->a32 = -s->a32;
+                    a12 = -a12;
+                    a22 = -a22;
+                    a32 = -a32;
                 }
                 
                 // negate g.
@@ -218,9 +234,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                     // |  1  0  0 |
                     // |  0  1  0 |
                     // |  0  0 -1 |
-                    s->a13 = -s->a13;
-                    s->a23 = -s->a23;
-                    s->a33 = -s->a33;
+                    a13 = -a13;
+                    a23 = -a23;
+                    a33 = -a33;
                 }
                 
                 // negate h.
@@ -259,9 +275,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                     // | -1  0  0 |
                     // |  0  1  0 |
                     // |  0  0  1 |
-                    s->a11 = -s->a11;
-                    s->a21 = -s->a21;
-                    s->a31 = -s->a31;
+                    a11 = -a11;
+                    a21 = -a21;
+                    a31 = -a31;
                 }
                 
                 // negate f.
@@ -276,9 +292,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                     // |  1  0  0 |
                     // |  0 -1  0 |
                     // |  0  0  1 |
-                    s->a12 = -s->a12;
-                    s->a22 = -s->a22;
-                    s->a32 = -s->a32;
+                    a12 = -a12;
+                    a22 = -a22;
+                    a32 = -a32;
                 }
                 
                 // negate g.
@@ -293,9 +309,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
                     // |  1  0  0 |
                     // |  0  1  0 |
                     // |  0  0 -1 |
-                    s->a13 = -s->a13;
-                    s->a23 = -s->a23;
-                    s->a33 = -s->a33;
+                    a13 = -a13;
+                    a23 = -a23;
+                    a33 = -a33;
                 }
                 
                 // negate h.
@@ -305,7 +321,7 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
         
         flag = !(abs(f) <= b && abs(g) <= a && abs(h) <= a && a+b+f+g+h >= 0);
     }
-    
+
     if (a+b+f+g+h == 0 && a+a+g+g+h > 0)
     {
         if (saveIsometry)
@@ -314,9 +330,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // | -1  0  1 |
             // |  0 -1  1 |
             // |  0  0  1 |
-            s->a13 += (s->a11 + s->a12); s->a11 = -s->a11; s->a12 = -s->a12;
-            s->a23 += (s->a21 + s->a22); s->a21 = -s->a21; s->a22 = -s->a22;
-            s->a33 += (s->a31 + s->a32); s->a31 = -s->a31; s->a32 = -s->a32;
+            a13 += (a11 + a12); a11 = -a11; a12 = -a12;
+            a23 += (a21 + a22); a21 = -a21; a22 = -a22;
+            a33 += (a31 + a32); a31 = -a31; a32 = -a32;
         }
         
         // apply the isometry.
@@ -333,9 +349,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // | -1 -1  0 |
             // |  0 -1  0 |
             // |  0  0  1 |
-            s->a12 += s->a11; s->a12 = -s->a12; s->a11 = -s->a11;
-            s->a22 += s->a21; s->a22 = -s->a22; s->a21 = -s->a21;
-            s->a32 += s->a31; s->a32 = -s->a32; s->a31 = -s->a31;
+            a12 += a11; a12 = -a12; a11 = -a11;
+            a22 += a21; a22 = -a22; a21 = -a21;
+            a32 += a31; a32 = -a32; a31 = -a31;
         }
         
         // apply the isometry.
@@ -352,9 +368,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // | -1  0 -1 |
             // |  0  1  0 |
             // |  0  0 -1 |
-            s->a13 += s->a11; s->a13 = -s->a13; s->a11 = -s->a11;
-            s->a23 += s->a21; s->a23 = -s->a23; s->a21 = -s->a21;
-            s->a33 += s->a31; s->a33 = -s->a33; s->a31 = -s->a31;
+            a13 += a11; a13 = -a13; a11 = -a11;
+            a23 += a21; a23 = -a23; a21 = -a21;
+            a33 += a31; a33 = -a33; a31 = -a31;
         }
         
         // apply the isometry.
@@ -371,9 +387,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // |  1  0  0 |
             // |  0 -1 -1 |
             // |  0  0 -1 |
-            s->a13 += s->a12; s->a13 = -s->a13; s->a12 = -s->a12;
-            s->a23 += s->a22; s->a23 = -s->a23; s->a22 = -s->a22;
-            s->a33 += s->a32; s->a33 = -s->a33; s->a32 = -s->a32;
+            a13 += a12; a13 = -a13; a12 = -a12;
+            a23 += a22; a23 = -a23; a22 = -a22;
+            a33 += a32; a33 = -a33; a32 = -a32;
         }
         
         // apply the isometry.
@@ -390,9 +406,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // | -1 -1  0 |
             // |  0  1  0 |
             // |  0  0 -1 |
-            s->a12 -= s->a11; s->a11 = -s->a11; s->a13 = -s->a13;
-            s->a22 -= s->a21; s->a21 = -s->a21; s->a23 = -s->a23;
-            s->a32 -= s->a31; s->a31 = -s->a31; s->a33 = -s->a33;
+            a12 -= a11; a11 = -a11; a13 = -a13;
+            a22 -= a21; a21 = -a21; a23 = -a23;
+            a32 -= a31; a31 = -a31; a33 = -a33;
         }
         
         // apply the isometry.
@@ -407,9 +423,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // | -1  0 -1 |
             // |  0 -1  0 |
             // |  0  0  1 |
-            s->a13 -= s->a11; s->a11 = -s->a11; s->a12 = -s->a12;
-            s->a23 -= s->a21; s->a21 = -s->a21; s->a22 = -s->a22;
-            s->a33 -= s->a31; s->a31 = -s->a31; s->a32 = -s->a32;
+            a13 -= a11; a11 = -a11; a12 = -a12;
+            a23 -= a21; a21 = -a21; a22 = -a22;
+            a33 -= a31; a31 = -a31; a32 = -a32;
         }
         
         // apply the isometry.
@@ -424,9 +440,9 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // | -1  0  0 |
             // |  0 -1 -1 |
             // |  0  0  1 |
-            s->a13 -= s->a12; s->a12 = -s->a12; s->a11 = -s->a11;
-            s->a23 -= s->a22; s->a22 = -s->a22; s->a21 = -s->a21;
-            s->a33 -= s->a32; s->a32 = -s->a32; s->a31 = -s->a31;
+            a13 -= a12; a12 = -a12; a11 = -a11;
+            a23 -= a22; a22 = -a22; a21 = -a21;
+            a33 -= a32; a32 = -a32; a31 = -a31;
         }
         
         // apply the isometry.
@@ -441,14 +457,16 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // |  0 -1  0 |
             // | -1  0  0 |
             // |  0  0 -1 |
-            temp = -s->a11; s->a11 = -s->a12; s->a12 = temp; s->a13 = -s->a13;
-            temp = -s->a21; s->a21 = -s->a22; s->a22 = temp; s->a23 = -s->a23;
-            temp = -s->a31; s->a31 = -s->a32; s->a32 = temp; s->a33 = -s->a33;
+            temp = -a11; a11 = -a12; a12 = temp; a13 = -a13;
+            temp = -a21; a21 = -a22; a22 = temp; a23 = -a23;
+            temp = -a31; a31 = -a32; a32 = temp; a33 = -a33;
         }
         
         // apply the isometry.
-        a.swap(b);
-        g.swap(f);
+        std::swap(a, b);
+        std::swap(g, f);
+        //a.swap(b);
+        //g.swap(f);
     }
     
     if (b == c && abs(g) > abs(h))
@@ -459,13 +477,14 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // | -1  0  0 |
             // |  0  0 -1 |
             // |  0 -1  0 |
-            temp = s->a12; s->a12 = -s->a13; s->a13 = -temp; s->a11 = -s->a11;
-            temp = s->a22; s->a22 = -s->a23; s->a23 = -temp; s->a21 = -s->a21;
-            temp = s->a32; s->a32 = -s->a33; s->a33 = -temp; s->a31 = -s->a31;
+            temp = a12; a12 = -a13; a13 = -temp; a11 = -a11;
+            temp = a22; a22 = -a23; a23 = -temp; a21 = -a21;
+            temp = a32; a32 = -a33; a33 = -temp; a31 = -a31;
         }
         
         // apply the isometry.
-        g.swap(h);
+        //g.swap(h);
+        std::swap(g, h);
     }
     
     if (a == b && abs(f) > abs(g))
@@ -476,13 +495,14 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // |  0 -1  0 |
             // | -1  0  0 |
             // |  0  0 -1 |
-            temp = s->a11; s->a11 = -s->a12; s->a12 = -temp; s->a13 = -s->a13;
-            temp = s->a21; s->a21 = -s->a22; s->a22 = -temp; s->a23 = -s->a23;
-            temp = s->a31; s->a31 = -s->a32; s->a32 = -temp; s->a33 = -s->a33;
+            temp = a11; a11 = -a12; a12 = -temp; a13 = -a13;
+            temp = a21; a21 = -a22; a22 = -temp; a23 = -a23;
+            temp = a31; a31 = -a32; a32 = -temp; a33 = -a33;
         }
         
         // apply the isometry.
-        g.swap(f);
+        //g.swap(f);
+        std::swap(g, f);
     }
 
 #ifdef DEBUG
@@ -492,9 +512,16 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
     }
 #endif
 
-    auto qq = std::make_shared<QuadFormZZ>(q.disc_, a, b, c, f, g, h);
+    auto qq = std::make_shared<QuadFormZZ>(
+        q.disc_,
+        mpz_class(a),
+        mpz_class(b),
+        mpz_class(c),
+        mpz_class(f),
+        mpz_class(g),
+        mpz_class(h));
 
-    qq->s_ = saveIsometry ? s : std::make_shared<IsometryQQ>(true);
+    qq->s_ = std::make_shared<IsometryQQ>(a11, a12, a13, a21, a22, a23, a31, a32, a33);
     qq->reduced_ = true;
 
 #ifdef DEBUG
