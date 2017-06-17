@@ -1144,7 +1144,7 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                 for (int64_t pivot : this->eigenvectorPivots_)
                 {
                     QuadFormPtr q = this->genusVec_[pivot];
-                    this->eigenvalueNeighborVec_.push_back(std::move(NeighborIterator<R,F>(q, p)));
+                    this->eigenvalueNeighborVec_.emplace_back(q, p);
                 }
             }
             ++index;
@@ -1529,15 +1529,11 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
             this->eigenvectorMap_[chi] = std::move(std::vector<Eigenvector>());
         }
         this->eigenvectorMap_[chi].push_back(std::move(vec));
-        //int64_t index = this->eigenvectorMap_[chi].size()-1;
-        //Eigenvector& eigenvector = this->eigenvectorMap_[chi][index];
 
         // Set up data structure for storing eigenvalues.
         this->eigenvalueMap_[numEigenvectors] = std::map<R, int64_t>();
 
         // Read pre-computed eigenvalues.
-        // TODO: Save these values to eigenvalueMap_ so that they don't get
-        // recomputed later.
         int64_t numPrimes;
         infile >> numPrimes;
         for (int64_t n = 0; n < numPrimes; n++)
@@ -1587,7 +1583,7 @@ void Genus<R,F>::assign_eigenvector_pivots_greedy(void)
     // A vector which will be populated with eigenvector pivots. These
     // correspond to the row of the Hecke operator which needs to be computed
     // in order to generate all eigenvalue for all eigenvectors.
-    this->eigenvectorPivots_ = std::move(std::vector<int64_t>());
+    this->eigenvectorPivots_.clear();
 
     // An unordered map of the eigenvector indices which are known to be
     // accounted for by the eigenvectorPivots_ vector.
