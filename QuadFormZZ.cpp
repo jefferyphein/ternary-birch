@@ -4,43 +4,51 @@
 #include "Math.h"
 #include "AutomorphismZZ.h"
 
+// A constant used to determine whether int64_t or mpz_class data types should
+// be used for reducing quadratic forms. If all coefficients of the supplied
+// quadratic form are smaller than this value, we will use int64_t, however if
+// any one coefficient is larger, we will use mpz_class.
+//
+// TODO: Perform some analysis and determine a tight bound on this value, so
+// that we can guarantee not to exceed std::numeric_limits<int64_t>::{min,max}
+// during a reduction call. The current value is merely an estimate.
+static constexpr int64_t UPPERBOUND = 1L << 20;
+
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
 typedef Isometry<mpz_class, mpq_class> IsometryQQ;
 typedef std::shared_ptr<IsometryQQ> IsometryQQPtr;
 typedef Math<mpz_class, mpq_class> MathZZ;
 
-template<>
-std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
-                                               bool saveIsometry)
+// This function is templatized to allow for native int64_t arithmetic. This
+// is significantly faster than mpz_class arithmetic, but may lead to overflow
+// issues when the coefficients are large enough. It is therefore import to
+// only set T=int64_t when the coefficients are sufficiently small; in all
+// other cases, set T=mpz_class.
+template<typename R, typename F, typename T>
+std::shared_ptr<QuadFormZZ> reduceT(const QuadFormZZ& q,
+                                    T a, T b, T c, T f, T g, T h,
+                                    bool saveIsometry)
 {
-    int64_t a = mpz_get_si(q.a_.get_mpz_t());
-    int64_t b = mpz_get_si(q.b_.get_mpz_t());
-    int64_t c = mpz_get_si(q.c_.get_mpz_t());
-    int64_t f = mpz_get_si(q.f_.get_mpz_t());
-    int64_t g = mpz_get_si(q.g_.get_mpz_t());
-    int64_t h = mpz_get_si(q.h_.get_mpz_t());
+    // Isometry coefficients.
+    T a11 = 1;
+    T a12 = 0;
+    T a13 = 0;
+    T a21 = 0;
+    T a22 = 1;
+    T a23 = 0;
+    T a31 = 0;
+    T a32 = 0;
+    T a33 = 1;
 
-    //std::cout << a << " " << b << " " << c << " " << f << " " << g << " " << h << std::endl;
-
-    int64_t a11 = 1;
-    int64_t a12 = 0;
-    int64_t a13 = 0;
-    int64_t a21 = 0;
-    int64_t a22 = 1;
-    int64_t a23 = 0;
-    int64_t a31 = 0;
-    int64_t a32 = 0;
-    int64_t a33 = 1;
-
-    // flag controlling the initial reduction loop.
+    // Flag controlling the initial reduction loop.
     bool flag = true;
     
-    // temporary variable.
-    int64_t temp;
+    // Temporary variable.
+    T temp;
     
     while (flag)
     {
-        int64_t t = a + b + f + g + h;
+        T t = a + b + f + g + h;
         if (t < 0)
         {
             if (saveIsometry)
@@ -143,8 +151,6 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // apply the isometry.
             std::swap(a, b);
             std::swap(f, g);
-            //a.swap(b);
-            //f.swap(g);
         }
         
         if (b > c || (b == c && abs(g) > abs(h)))
@@ -163,8 +169,6 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // apply the isometry.
             std::swap(b, c);
             std::swap(g, h);
-            //b.swap(c);
-            //g.swap(h);
         }
         
         if (a > b || (a == b && abs(f) > abs(g)))
@@ -183,8 +187,6 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
             // apply the isometry.
             std::swap(a, b);
             std::swap(f, g);
-            //a.swap(b);
-            //f.swap(g);
         }
         
         if (f * g * h > 0)
@@ -465,8 +467,6 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
         // apply the isometry.
         std::swap(a, b);
         std::swap(g, f);
-        //a.swap(b);
-        //g.swap(f);
     }
     
     if (b == c && abs(g) > abs(h))
@@ -483,7 +483,6 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
         }
         
         // apply the isometry.
-        //g.swap(h);
         std::swap(g, h);
     }
     
@@ -501,19 +500,12 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
         }
         
         // apply the isometry.
-        //g.swap(f);
         std::swap(g, f);
     }
 
-#ifdef DEBUG
-    if (saveIsometry)
-    {
-        assert( s->is_isometry(q, a, b, c, f, g, h) );
-    }
-#endif
-
-    auto qq = std::make_shared<QuadFormZZ>(
-        q.disc_,
+    // The reduced quadratic form.
+    std::shared_ptr<QuadFormZZ> qq = std::make_shared<QuadFormZZ>(
+        q.discriminant(),
         mpz_class(a),
         mpz_class(b),
         mpz_class(c),
@@ -521,16 +513,75 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
         mpz_class(g),
         mpz_class(h));
 
-    qq->s_ = std::make_shared<IsometryQQ>(a11, a12, a13, a21, a22, a23, a31, a32, a33);
-    qq->reduced_ = true;
-
-#ifdef DEBUG
     if (saveIsometry)
     {
-        assert( qq->isometry()->is_isometry(q, *qq) );
-    }
-#endif
+        // The isometry accompanying this reduction.
+        std::shared_ptr<IsometryQQ> s = std::make_shared<IsometryQQ>(
+            mpq_class(a11),
+            mpq_class(a12),
+            mpq_class(a13),
+            mpq_class(a21),
+            mpq_class(a22),
+            mpq_class(a23),
+            mpq_class(a31),
+            mpq_class(a32),
+            mpq_class(a33));
 
+        // Assign the isometry.
+        qq->isometry(s);
+
+#ifdef DEBUG
+        assert( qq->isometry()->is_isometry(q, *qq) );
+#endif
+    }
+    else
+    {
+        qq->isometry(std::make_shared<IsometryQQ>(true));
+    }
+
+    return qq;
+}
+
+template<>
+std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
+                                               bool saveIsometry)
+{
+    // The coefficients.
+    mpz_class a = q.a_;
+    mpz_class b = q.b_;
+    mpz_class c = q.c_;
+    mpz_class f = q.f_;
+    mpz_class g = q.g_;
+    mpz_class h = q.h_;
+
+    // The pointer that we will eventually return.
+    std::shared_ptr<QuadFormZZ> qq;
+
+    // If the size of all coefficients is reasonably small, we can perform all
+    // computations with native int64_t data types instead of mpz_class
+    // objects.
+    if (abs(a) < UPPERBOUND && abs(b) < UPPERBOUND && abs(c) < UPPERBOUND &&
+        abs(f) < UPPERBOUND && abs(g) < UPPERBOUND && abs(h) < UPPERBOUND)
+    {
+        // The coefficients as int64_t data types.
+        int64_t aa = mpz_get_si(a.get_mpz_t());
+        int64_t bb = mpz_get_si(b.get_mpz_t());
+        int64_t cc = mpz_get_si(c.get_mpz_t());
+        int64_t ff = mpz_get_si(f.get_mpz_t());
+        int64_t gg = mpz_get_si(g.get_mpz_t());
+        int64_t hh = mpz_get_si(h.get_mpz_t());
+
+        // Reduce with T=int64_t.
+        qq = reduceT<mpz_class, mpq_class, int64_t>(q, aa, bb, cc, ff, gg, hh, saveIsometry);
+    }
+    else
+    {
+        // Reduce with T=mpz_class.
+        qq = reduceT<mpz_class, mpq_class, mpz_class>(q, a, b, c, f, g, h, saveIsometry);
+    }
+
+    // Set the reduction flag and return the shared pointer.
+    qq->reduced_ = true;
     return qq;
 }
 

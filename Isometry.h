@@ -29,7 +29,6 @@ template<typename R, typename F>
 class Isometry
 {
 /* Allow these classes to manipulate the private members of this class. */
-friend class QuadForm<R,F>;
 friend class NeighborIterator<R,F>;
 
 public:
