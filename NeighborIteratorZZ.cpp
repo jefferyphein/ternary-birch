@@ -39,7 +39,8 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
      * quadratic form. */
 
     // These coefficients will help us track p-standard basis transformation.
-    mpz_class a, b, c, f, g, h;
+    mpz_class a;
+    mpz_class b, c, f, g, h;
 
     if (this->isotropicVector_[0] == 1)
     {
@@ -52,12 +53,14 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
         this->s_->a22 = 1;
         this->s_->a33 = 1;
 
+#ifdef DEBUG
         a = (this->q_->a() +
             u * (this->q_->b() * u +
                  this->q_->f() * v +
                  this->q_->h()) +
             v * (this->q_->c() * v +
                  this->q_->g())) % p;
+#endif
         b = this->q_->b() % p;
         c = this->q_->c() % p;
         f = this->q_->f() % p;
@@ -77,9 +80,11 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
         this->s_->a12 = 1;
         this->s_->a33 = 1;
 
+#ifdef DEBUG
         a = (this->q_->b() +
              u * (this->q_->c() * u +
                   this->q_->f())) % p;
+#endif
         b = this->q_->a() % p;
         c = this->q_->c() % p;
         f = this->q_->g() % p;
@@ -94,7 +99,9 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
         this->s_->a12 = 1;
         this->s_->a23 = 1;
 
+#ifdef DEBUG
         a = this->q_->c() % p;
+#endif
         b = this->q_->a() % p;
         c = this->q_->b() % p;
         f = this->q_->h() % p;
@@ -121,19 +128,13 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
 
     // Scalar to make (h % p) == 0.
     mpz_class scalar = (-h * MathZZ::modinv(g, p)) % p;
-
-    if (p != 2)
-    {
-        // Make the absolute value of this scalar as small as possible.
-        if (scalar < 0 && -scalar > (p-1)/2) { scalar += p; }
-        else if (scalar > 0 && scalar > (p-1)/2) { scalar -= p; }
-    }
+    MathZZ::fix_value(scalar, p);
 
     b = (b + scalar * (f + c * scalar)) % p;
     f = (f + 2 * c * scalar) % p;
+#ifdef DEBUG
     h = (h + scalar * g) % p;
 
-#ifdef DEBUG
     assert( h == 0 );
 #endif
 
@@ -147,28 +148,23 @@ NeighborIteratorZZ::NeighborIterator(std::shared_ptr<QuadFormZZ> q, const mpz_cl
     this->s_->a32 = (this->s_->a32 + this->s_->a33 * scalar) % p;
 
     mpz_class ginv = MathZZ::modinv(g, p);
-    this->s_->a12 = (this->s_->a12 - this->s_->a11 * f * ginv) % p;
-    this->s_->a22 = (this->s_->a22 - this->s_->a21 * f * ginv) % p;
-    this->s_->a32 = (this->s_->a32 - this->s_->a31 * f * ginv) % p;
-    this->s_->a13 = (ginv * (this->s_->a13 - this->s_->a11 * c * ginv)) % p;
-    this->s_->a23 = (ginv * (this->s_->a23 - this->s_->a21 * c * ginv)) % p;
-    this->s_->a33 = (ginv * (this->s_->a33 - this->s_->a31 * c * ginv)) % p;
+    mpz_class fginv = (f * ginv) % p;
+    mpz_class cginv = (c * ginv) % p;
+    this->s_->a12 = (this->s_->a12 - this->s_->a11 * fginv) % p;
+    this->s_->a22 = (this->s_->a22 - this->s_->a21 * fginv) % p;
+    this->s_->a32 = (this->s_->a32 - this->s_->a31 * fginv) % p;
+    this->s_->a13 = (ginv * (this->s_->a13 - this->s_->a11 * cginv)) % p;
+    this->s_->a23 = (ginv * (this->s_->a23 - this->s_->a21 * cginv)) % p;
+    this->s_->a33 = (ginv * (this->s_->a33 - this->s_->a31 * cginv)) % p;
 
     // Set the anisotropic value for this p-standard basis.
     this->aniso_ = b % p;
-    if (p != 2)
-    {
-        if (this->aniso_ < 0 && -this->aniso_ < (p-1)/2) { this->aniso_ += p; }
-        else if (this->aniso_ > 0 && this->aniso_ > (p-1)/2) { this->aniso_ -= p; }
-    }
+    MathZZ::fix_value(this->aniso_, p);
 }
 
 template<>
 const std::shared_ptr<QuadFormZZ> NeighborIteratorZZ::build_neighbor(std::vector<mpz_class>& vec) const
 {
-    // The prime integer.
-    //mpz_class p = this->p_;
-
     // Normalize the isotropic vector modulo p, then adjust its coefficients
     // so that their absolute value is as small as possible.
     MathZZ::normalize_vector(vec, this->p_);

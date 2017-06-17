@@ -21,7 +21,7 @@ typedef Math<mpz_class, mpq_class> MathZZ;
 
 // This function is templatized to allow for native int64_t arithmetic. This
 // is significantly faster than mpz_class arithmetic, but may lead to overflow
-// issues when the coefficients are large enough. It is therefore import to
+// issues when the coefficients are large enough. It is therefore important to
 // only set T=int64_t when the coefficients are sufficiently small; in all
 // other cases, set T=mpz_class.
 template<typename R, typename F, typename T>

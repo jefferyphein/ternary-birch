@@ -54,6 +54,14 @@ void MathZZ::fix_vector(std::vector<mpz_class>& vec, const mpz_class& p)
 }
 
 template<>
+void MathZZ::fix_value(mpz_class& x, const mpz_class& p)
+{
+    if (p == 2 && x != 0) { x = 1; }
+    else if (x > (p-1)/2) { x -= p; }
+    else if (-x > (p-1)/2) { x += p; }
+}
+
+template<>
 void MathZZ::normalize_vector(std::vector<mpz_class>& vec, const mpz_class& p)
 {
     if (vec.size() != 3)

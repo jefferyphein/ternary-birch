@@ -13,6 +13,7 @@ public:
     static R pow(const R& a, const R& e, const R& p);
     static R modinv(const R& a, const R& p);
     static void fix_vector(std::vector<R>& vec, const R& p);
+    static void fix_value(R& vec, const R& p);
     static void normalize_vector(std::vector<R>& vec, const R& p);
     static int64_t kronecker(const R& a, const R& b);
     static R square_root(R a, const R& p);
