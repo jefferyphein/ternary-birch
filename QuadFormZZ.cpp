@@ -592,6 +592,7 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
     {
         // Reduce with T=mpz_class.
         qq = reduceT<mpz_class, mpq_class, mpz_class>(q, a, b, c, f, g, h, saveIsometry);
+        std::cout << "mpz" << std::endl;
     }
 
     // Set the reduction flag and return the shared pointer.
