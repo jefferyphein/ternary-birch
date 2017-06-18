@@ -11,8 +11,8 @@
 //
 // TODO: Perform some analysis and determine a tight bound on this value, so
 // that we can guarantee not to exceed std::numeric_limits<int64_t>::{min,max}
-// during a reduction call. The current value is merely an estimate.
-static constexpr int64_t UPPERBOUND = 1L << 20;
+// during a reduction call. The current value is merely an experimental value.
+static constexpr int64_t UPPERBOUND = 1L << 40;
 
 typedef QuadForm<mpz_class, mpq_class> QuadFormZZ;
 typedef Isometry<mpz_class, mpq_class> IsometryQQ;
@@ -24,6 +24,11 @@ typedef Math<mpz_class, mpq_class> MathZZ;
 // issues when the coefficients are large enough. It is therefore important to
 // only set T=int64_t when the coefficients are sufficiently small; in all
 // other cases, set T=mpz_class.
+//
+// NOTE: The coefficients a, b, c, f, g, h are never multiplied together
+// during this routine, they are only ever added or subtracted. The only
+// exception being the computation of the variable `t` during the first while
+// loop.
 template<typename R, typename F, typename T>
 std::shared_ptr<QuadFormZZ> reduceT(const QuadFormZZ& q,
                                     T a, T b, T c, T f, T g, T h,
@@ -188,8 +193,17 @@ std::shared_ptr<QuadFormZZ> reduceT(const QuadFormZZ& q,
             std::swap(a, b);
             std::swap(f, g);
         }
-        
-        if (f * g * h > 0)
+
+        // Determine the sign of f*g*h.
+        bool fgh = (f != 0 && g != 0 && h != 0); 
+        if (fgh)
+        {
+            if (f < 0) fgh = !fgh;
+            if (g < 0) fgh = !fgh;
+            if (h < 0) fgh = !fgh;
+        }
+
+        if (fgh)
         {
             // note that for us to enter this block, we must have either a pair of
             //  f, g, h negative, or none of them. in what follows, we do not
@@ -578,6 +592,7 @@ std::shared_ptr<QuadFormZZ> QuadFormZZ::reduce(const QuadFormZZ& q,
     {
         // Reduce with T=mpz_class.
         qq = reduceT<mpz_class, mpq_class, mpz_class>(q, a, b, c, f, g, h, saveIsometry);
+        std::cout << "mpz" << std::endl;
     }
 
     // Set the reduction flag and return the shared pointer.
