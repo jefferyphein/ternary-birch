@@ -148,7 +148,7 @@ mpz_class MathZZ::square_root(mpz_class a, const mpz_class& p)
 }
 
 template<>
-int64_t MathZZ::valuation(mpq_class x, mpz_class p)
+int64_t MathZZ::valuation(const mpq_class& x, const mpz_class& p)
 {
     mpz_class num = x.get_num();
     if (num == 0) { return 0; }
