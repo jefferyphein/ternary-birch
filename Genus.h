@@ -542,30 +542,30 @@ void Genus<R,F>::compute_genus(int64_t numThreads)
         {
             // The current genus representative.
             QuadFormPtr cur = this->genusVec_[index++];
-    
+
             // The neighbor iterator.
             NeighborIterator<R,F> it(cur, p);
-    
+
             // The first neighbor.
             QuadFormPtr pn = it.next_neighbor();
-    
+
 #ifdef DEBUG
             assert( pn->isometry()->is_isometry(*this->q_, *pn) );
 #endif
-    
+
             // Loop over all p-neighbors.
             while (pn != nullptr)
             {
 #ifdef DEBUG
                 assert( pn->isometry()->is_isometry(*this->q_, *pn) );
 #endif
-    
+
                 // Reduce the p-neighbor.
                 QuadFormPtr qq = QuadForm<R,F>::reduce(*pn);
-    
+
                 // Add this reduce form to the genus, if necessary.
                 this->add_genus_rep(qq, pn);
-    
+
                 // Get the next p-neighbor.
                 pn = it.next_neighbor();
             }
@@ -1001,28 +1001,28 @@ void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<int64_t, std
         // quadratic form to the genus representative isometric to this
         // p-neighbor.
         neighbor->isometry()->multiply_on_right_by(reduced->isometry());
-    
+
 #ifdef DEBUG
         assert( neighbor->isometry()->is_isometry(*this->q_, *rep.quad_form()) );
 #endif
-        
+
         // Obtain an automorphism of the original quadratic form.
         neighbor->isometry()->multiply_on_right_by(rep.inverse());
-        
+
 #ifdef DEBUG
         assert( neighbor->isometry()->is_automorphism(*this->q_) );
 #endif
-        
+
         // Convenient reference for the automorphism we'll use.
         std::shared_ptr<Isometry<R,F>> aut = neighbor->isometry();
-    
+
         // Compute the character value for each of the primitive characters.
         std::map<R,int64_t> primeValues;
         for (const Character<R,F>& chi : this->primeCharSet_)
         {
             primeValues[chi.conductor()] = chi.rho(*aut, *this->q_);
         }
-    
+
         for (auto& it : this->eigenvectorMap_)
         {
             // Get the character and the relative position of this genus rep
@@ -1206,12 +1206,12 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                 // Build the neighbor iterator and let's get started.
                 NeighborIterator<R,F> it(q, p);
                 QuadFormPtr neighbor = it.next_neighbor();
-    
+
                 while (neighbor != nullptr)
                 {
                     QuadFormPtr reduced = QuadForm<R,F>::reduce(*neighbor);
                     const GenusRep<R,F>& rep = this->find_genus_rep(reduced);
-        
+
                     // Determine whether we actually need to compute anything for this
                     // p-neighbor.
                     bool needed = false;
@@ -1220,7 +1220,7 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                         const R& cond = it.first.conductor();
                         int64_t relPos = rep.position(cond);
                         if (relPos == -1) { continue; }
-        
+
                         for (auto& vec : it.second)
                         {
                             if (vec[relPos] == 0) { continue; }
@@ -1231,7 +1231,7 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                             }
                         }
                     }
-        
+
                     // If we don't need to compute anything, get the next neighbor and
                     // continue.
                     if (!needed)
@@ -1239,34 +1239,34 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                         neighbor = it.next_neighbor();
                         continue;
                     }
-        
+
                     // Multiply the p-neighbor isometry on the right by the reduction
                     // isometry. This now represents an isometry from the original
                     // quadratic form to the genus representative isometric to this
                     // p-neighbor.
                     neighbor->isometry()->multiply_on_right_by(reduced->isometry());
-                
+
 #ifdef DEBUG    
                     assert( neighbor->isometry()->is_isometry(*this->q_, *rep.quad_form()) );
 #endif
-                
+
                     // Obtain an automorphism of the original quadratic form.
                     neighbor->isometry()->multiply_on_right_by(rep.inverse());
-                
+
 #ifdef DEBUG    
                     assert( neighbor->isometry()->is_automorphism(*this->q_) );
 #endif
-                
+
                     // Convenient reference for the automorphism we'll use.
                     std::shared_ptr<Isometry<R,F>> aut = neighbor->isometry();
-        
+
                     // Compute the character value for each of the primitive characters.
                     std::map<R,int64_t> primeValues;
                     for (const Character<R,F>& chi : this->primeCharSet_)
                     {
                         primeValues[chi.conductor()] = chi.rho(*aut, *this->q_);
                     }
-        
+
                     for (auto& it : this->eigenvectorMap_)
                     {
                         // Get the character and the relative position of this genus rep
@@ -1275,14 +1275,14 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                         const Character<R,F>& chi = it.first;
                         int64_t repPos = rep.position(chi);
                         if (repPos == -1) { continue; }
-        
+
                         // Compute the value of this character.
                         int64_t value = 1;
                         for (const R& p : chi.primes())
                         {
                             value *= primeValues[p];
                         }
-        
+
                         // Loop over the eigenvectors associated to this character.
                         for (auto& vec : it.second)
                         {
@@ -1295,18 +1295,18 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
                             }
                         }
                     }
-        
+
                     neighbor = it.next_neighbor();
                 }
             }
         }
     }
-    
+
     // Recover the eigenvalues for each eigenvector.
     for (auto& it : this->eigenvectorMap_)
     {
         const Character<R,F>& chi = it.first;
-    
+
         // Update the eigenvalues.
         for (auto& vec : it.second)
         {
@@ -1568,7 +1568,7 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
         {
             const R& cond = it.first.conductor();
             int64_t relPos = rep.position(cond);
-        
+
             if (relPos != -1)
             {
                 this->absolutePosition_[cond][relPos] = absPos;

@@ -17,7 +17,7 @@ public:
     const R& conductor(void) const;
     const std::vector<R>& primes(void) const;
     bool operator<(const Character<R,F>& repr) const;
-    
+
 private:
     std::vector<R> ps_;
     R cond_;

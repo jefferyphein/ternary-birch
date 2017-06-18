@@ -210,7 +210,7 @@ void Isometry<R,F>::multiply_on_right_by(std::shared_ptr<Isometry<R,F>> s)
     F a31 = this->a31;
     F a32 = this->a32;
     F a33 = this->a33;
-   
+
     this->a11 = a11*s->a11 + a12*s->a21 + a13*s->a31;
     this->a12 = a11*s->a12 + a12*s->a22 + a13*s->a32;
     this->a13 = a11*s->a13 + a12*s->a23 + a13*s->a33;
@@ -234,7 +234,7 @@ void Isometry<R,F>::multiply_on_left_by(std::shared_ptr<Isometry<R,F>> s)
     F a31 = this->a31;
     F a32 = this->a32;
     F a33 = this->a33;
-    
+
     this->a11 = a11*s->a11 + a21*s->a12 + a31*s->a13;
     this->a12 = a12*s->a11 + a22*s->a12 + a32*s->a13;
     this->a13 = a13*s->a11 + a23*s->a12 + a33*s->a13;

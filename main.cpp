@@ -127,7 +127,7 @@ int main(int argc, char** argv)
         std::cout << "Computes the the genus, Hecke operators, and Hecke eigenvalues of integral" << std::endl;
         std::cout << "ternary quadratic forms with shape" << std::endl;
         std::cout << "        ax^2 + by^2 + cz^2 + fyz + gxz + hxy" << std::endl << std::endl;
- 
+
         std::cout << "Options:" << std::endl;
         std::cout << "  -a       attach a character for each squarefree divisor of the discriminant" << std::endl;
         std::cout << "  -c N     attach a character with conductor N" << std::endl;
