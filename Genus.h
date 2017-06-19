@@ -837,6 +837,8 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
 
     if (!needToCompute) { return; }
 
+    std::cout << "Hmm..." << std::endl;
+
     if (numThreads > 0)
     {
         // Initialize the shared pointer used by threads to compute the Hecke
@@ -1466,6 +1468,9 @@ void Genus<R,F>::import_genus(const std::string& filename)
         // Attempt to read conductor and prime from file.
         infile >> cond >> p;
     }
+
+    // Set the computed flag.
+    this->computed_ = true;
 }
 
 template<typename R, typename F>
