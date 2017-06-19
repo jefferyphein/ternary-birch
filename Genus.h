@@ -837,8 +837,6 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
 
     if (!needToCompute) { return; }
 
-    std::cout << "Hmm..." << std::endl;
-
     if (numThreads > 0)
     {
         // Initialize the shared pointer used by threads to compute the Hecke
