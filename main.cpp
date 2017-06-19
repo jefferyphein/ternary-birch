@@ -289,9 +289,10 @@ int main(int argc, char** argv)
 
     if (outfilename.empty())
     {
-        // If no output filename was specified, and the genus was actually
-        // computed, print the genus to stdout.
-        if (genus->computed())
+        // If no output filename was specified, the genus was actually
+        // computed, and no eigenvector file was specified, then print the
+		// genus to stdout.
+        if (genus->computed() && eigfilename.empty())
         {
             std::cout << *genus;
         }
