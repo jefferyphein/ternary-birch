@@ -52,6 +52,35 @@ int64_t SparseMatrix::num_rows(void) const
     return this->data_.size();
 }
 
+int64_t SparseMatrix::at(int64_t row, int64_t col) const
+{
+    // Check for invalid rows.
+    if (row < 0 || row >= this->rows_)
+    {
+        throw std::range_error("Invalid row.");
+    }
+
+    // Check for invalid columns.
+    if (col < 0 || col >= this->cols_)
+    {
+        throw std::range_error("Invalid column.");
+    }
+
+    // If the specified row doesn't exist, the value is zero.
+    auto it1 = this->data_.find(row);
+    if (it1 == this->data_.end()) { return 0; }
+
+    // Get the row.
+    const std::map<int64_t, int64_t>& thisRow = it1->second;
+
+    // If the specified column doesn't exist for this row, the value is zero.
+    auto it2 = thisRow.find(col);
+    if (it2 == thisRow.end()) { return 0; }
+
+    // Return the value.
+    return it2->second;
+}
+
 std::ostream& operator<<(std::ostream& os, const SparseMatrix& mat)
 {
     mat.print(os);

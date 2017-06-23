@@ -20,6 +20,9 @@ public:
     int64_t num_rows(void) const;
     void import(std::ifstream& is);
 
+    const SparseMatrix& matrix(void) const;
+    int64_t at(int64_t row, int64_t col) const;
+
 private:
     int64_t dim_;
     SparseMatrix m_;
@@ -84,6 +87,18 @@ void HeckeOperator<R,F>::import(std::ifstream& is)
             this->add_row(row, theRow);
         }
     }
+}
+
+template<typename R, typename F>
+const SparseMatrix& HeckeOperator<R,F>::matrix(void) const
+{
+    return this->m_;
+}
+
+template<typename R, typename F>
+int64_t HeckeOperator<R,F>::at(int64_t row, int64_t col) const
+{
+    return this->m_.at(row, col);
 }
 
 #endif // __HECKE_OPERATOR_H_

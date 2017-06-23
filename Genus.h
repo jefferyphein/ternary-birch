@@ -86,7 +86,8 @@ public:
 
     void compute_hecke_operators(const R& p, int64_t numThreads=0);
 
-    HeckePtr hecke_operator(const R& p, const Character<R,F>& chi);
+    HeckePtr hecke_operator(const R& p, const R& cond) const;
+    HeckePtr hecke_operator(const R& p, const Character<R,F>& chi) const;
 
     void import_eigenvectors(const std::string& filename);
     void export_eigenvectors(const std::string& filename);
@@ -290,13 +291,15 @@ template<typename R, typename F>
 int64_t GenusRep<R,F>::dimension(const Character<R,F>& chi) const
 {
     const R& cond = chi.conductor();
-    if (this->dimensionMap_.count(cond) > 0)
+    auto it = this->dimensionMap_.find(cond);
+
+    if (it == this->dimensionMap_.end())
     {
-        return this->dimensionMap_.find(cond)->second;
+        return 0;
     }
     else
     {
-        return 0;
+        return it->second;
     }
 }
 
@@ -677,13 +680,6 @@ void Genus<R,F>::add_character(const Character<R,F>& chi)
 }
 
 template<typename R, typename F>
-std::shared_ptr<HeckeOperator<R,F>> Genus<R,F>::hecke_operator(const R& p, const Character<R,F>& chi)
-{
-    auto ptr = std::make_shared<HeckeOperator<R,F>>(*this, chi);
-    return ptr;
-}
-
-template<typename R, typename F>
 void Genus<R,F>::update_hecke_operators(const GenusRep<R,F>& rep,
                                         QuadFormPtr neighbor,
                                         std::map<R, std::map<int64_t, int64_t>>& rowMap)
@@ -903,6 +899,36 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
 }
 
 template<typename R, typename F>
+std::shared_ptr<HeckeOperator<R,F>> Genus<R,F>::hecke_operator(const R& p, const R& cond) const
+{
+    // Determine whether there is an entry for this conductor in the map.
+    auto it1 = this->heckeMap_.find(cond);
+    if (it1 == this->heckeMap_.end())
+    {
+        throw std::range_error("No Hecke operators associated to this conductor.");
+    }
+
+    // Get the map for the Hecke operators associated to this conductor.
+    const std::map<R, HeckePtr>& temp = it1->second;
+
+    // Determine whether there is a Hecke operator for this prime associated to this conductor.
+    auto it2 = temp.find(p);
+    if (it2 == temp.end())
+    {
+        throw std::range_error("No Hecke operator for this prime associated to this conductor.");
+    }
+
+    // Return a shared pointer to the requested Hecke operator.
+    return it2->second;
+}
+
+template<typename R, typename F>
+std::shared_ptr<HeckeOperator<R,F>> Genus<R,F>::hecke_operator(const R& p, const Character<R,F>& chi) const
+{
+    return this->hecke_operator(p, chi.conductor());
+}
+
+template<typename R, typename F>
 void Genus<R,F>::threaded_compute_eigenvalues(std::promise<std::map<int64_t, std::map<R, int64_t>>>& aps)
 {
     // Initialize running eigenvalue tallies.
@@ -1100,11 +1126,12 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         for (Eigenvector& vec : it.second)
         {
             // Create map of prime/eigenvalue pairs.
-            if (this->eigenvalueMap_.count(vec.index()) == 0)
+            auto it = this->eigenvalueMap_.find(vec.index());
+            if (it == this->eigenvalueMap_.end())
             {
                 this->eigenvalueMap_[vec.index()] = std::move(std::map<R, int64_t>());
             }
-            std::map<R, int64_t>& tempMap = this->eigenvalueMap_[vec.index()];
+            std::map<R, int64_t>& tempMap = it->second;
 
             // Initialize eigenvalues at the good primes, if necessary.
             int64_t index = 0;
@@ -1334,26 +1361,28 @@ template<typename R, typename F>
 int64_t Genus<R,F>::dimension(const Character<R,F>& chi) const
 {
     const R& cond = chi.conductor();
-    if (this->dimensionMap_.count(cond) > 0)
+    auto it = this->dimensionMap_.find(cond);
+    if (it == this->dimensionMap_.end())
     {
-        return this->dimensionMap_.find(cond)->second;
+        return 0;
     }
     else
     {
-        return 0;
+        return it->second;
     }
 }
 
 template<typename R, typename F>
 int64_t Genus<R,F>::dimension(const R& cond) const
 {
-    if (this->dimensionMap_.count(cond) > 0)
+    auto it = this->dimensionMap_.find(cond);
+    if (it == this->dimensionMap_.end())
     {
-        return this->dimensionMap_.find(cond)->second;
+        return 0;
     }
     else
     {
-        return 0;
+        return it->second;
     }
 }
 
@@ -1513,14 +1542,15 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
     while (!infile.eof())
     {
         // Do we have a character with this conductor?
-        if (this->dimensionMap_.count(cond) == 0)
+        auto it = this->dimensionMap_.find(cond);
+        if (it == this->dimensionMap_.end())
         {
             throw std::runtime_error("Eigenvector with unassociated conductor found, cannot proceed.");
         }
 
         // Okay, let's get it, and figure out the dimension.
         const Character<R,F>& chi = this->condToChar_[cond];
-        int64_t dim = this->dimensionMap_[cond];
+        int64_t dim = it->second;
 
         // Read the eigenvector coefficients.
         Eigenvector vec(dim, numEigenvectors);
