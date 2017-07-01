@@ -1,4 +1,3 @@
-#include <memory>
 #include "AutomorphismZZ.h"
 
 typedef Isometry<mpz_class, mpq_class> IsometryQQ;

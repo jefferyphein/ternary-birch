@@ -1,5 +1,3 @@
-#include <memory>
-#include <map>
 #include "Genus.h"
 #include "Math.h"
 

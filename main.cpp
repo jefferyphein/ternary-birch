@@ -28,6 +28,7 @@ int main(int argc, char** argv)
     bool quadformProvided = false;
     bool helpMessage = false;
     bool helpMessageLong = false;
+    bool silent = false;
     int64_t numThreads = 0;
     int64_t maxThreads = std::thread::hardware_concurrency();
 
@@ -65,7 +66,7 @@ int main(int argc, char** argv)
     /*** PARSE COMMAND-LINE ARGUMENTS ***************************************/
 
     int cc;
-    while ((cc = getopt(argc, argv, "he:i:ac:o:p:u:j:x")) != -1)
+    while ((cc = getopt(argc, argv, "he:i:ac:o:p:u:j:xs")) != -1)
     {
         switch (cc)
         {
@@ -105,6 +106,9 @@ int main(int argc, char** argv)
             case 'p':
                 primes.push_back(mpz_class(optarg));
                 break;
+            case 's':
+                silent = true;
+                break;
             case 'u':
                 upto = mpz_class(optarg);
                 break;
@@ -138,6 +142,7 @@ int main(int argc, char** argv)
         std::cout << "  -j N     launch N threads when performing computations" << std::endl;
         std::cout << "  -o FILE  save genus and Hecke operator data to FILE" << std::endl;
         std::cout << "  -p N     compute Hecke operator or eigenvalues at N; must be a prime" << std::endl;
+        std::cout << "  -s       do not print genus data when output file unspecified" << std::endl;
         std::cout << "  -u N     compute Hecke operators or eigenvalues for all primes <= N" << std::endl;
         std::cout << "  -x       launch the maximum number of threads supported by the system" << std::endl;
         std::cout << std::endl;
@@ -292,7 +297,7 @@ int main(int argc, char** argv)
         // If no output filename was specified, the genus was actually
         // computed, and no eigenvector file was specified, then print the
 		// genus to stdout.
-        if (genus->computed() && eigfilename.empty())
+        if (genus->computed() && eigfilename.empty() && !silent)
         {
             std::cout << *genus;
         }

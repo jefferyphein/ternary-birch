@@ -84,8 +84,8 @@ void HeckeOperator<R,F>::import(std::ifstream& is)
             int64_t col, value;
             is >> col >> value;
             theRow[col] = value;
-            this->add_row(row, theRow);
         }
+        this->add_row(row, theRow);
     }
 }
 

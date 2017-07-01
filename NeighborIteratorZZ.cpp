@@ -1,6 +1,3 @@
-#include <memory>
-#include <iostream>
-#include <iomanip>
 #include <cassert>
 #include "NeighborIterator.h"
 #include "QuadForm.h"

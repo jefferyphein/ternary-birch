@@ -664,7 +664,6 @@ std::vector<mpz_class> QuadFormZZ::isotropic_vector(const mpz_class& p) const
 
     int64_t ll = MathZZ::kronecker(v, p);
 
-
     if (ll == 1)
     {
         mpz_class sqr = MathZZ::square_root(v, p);

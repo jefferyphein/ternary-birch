@@ -1,6 +1,3 @@
-#include <cmath>
-#include <gmpxx.h>
-#include <iostream>
 #include "Math.h"
 
 typedef Math<mpz_class, mpq_class> MathZZ;

@@ -4,6 +4,9 @@
 # can properly load external libraries.
 #
 
+env = Environment()
+debug = ARGUMENTS.get('debug', 0)
+
 srcs = Split('''
     main.cpp
     AutomorphismZZ.cpp
@@ -31,7 +34,6 @@ libpath = Split('''
 ''')
 
 ccflags = Split('''
-    -g
     -Wall
     -O3
     -Wextra
@@ -39,6 +41,12 @@ ccflags = Split('''
     -pedantic
     -std=c++11
 ''')
+
+if int(debug):
+    ccflags += Split('''
+        -g
+        -DDEBUG
+    ''')
 
 Program(
     target = 'birch',

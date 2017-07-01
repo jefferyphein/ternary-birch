@@ -1,6 +1,4 @@
-#include <map>
 #include <iostream>
-#include <iomanip>
 #include <gmpxx.h>
 #include "SparseMatrix.h"
 

@@ -423,10 +423,7 @@ void Genus<R,F>::threaded_compute_genus(const R& p, int64_t threadid)
 
             // Release the lock and sleep for a random number of milliseconds.
             this->genusMutex_.unlock();
-            std::default_random_engine dre(threadid);
-            std::uniform_int_distribution<int64_t> id(0, 20);
-            std::this_thread::sleep_for(std::chrono::milliseconds(id(dre)));
-            continue;
+            std::this_thread::yield();
         }
         else
         {
@@ -499,18 +496,6 @@ void Genus<R,F>::compute_genus(int64_t numThreads)
 
     // Determine the smallest good prime.
     R p = this->smallest_good_prime();
-
-    // The number of p-neighbors this prime will produce.
-    int64_t numNeighbors = NeighborIterator<R,F>::num_neighbors(p);
-
-    // Determine the number of threads to use, up to the specified value. This
-    // allows for faster genus computation in some cases where the prime only
-    // provides a small number of p-neighbors.
-    if (numNeighbors <= 6)
-    {
-        // When there are only a few p-neighbors, do not multithread.
-        numThreads = 0;
-    }
 
     // Should we use threads?
     if (numThreads > 0)
