@@ -1605,6 +1605,14 @@ void Genus<R,F>::assign_eigenvector_pivots(void)
     // based on which positions are zero (0) or nonzero (1).
     int64_t numLimbs = 1 + (this->genusVec_.size() - 1) / 64;
 
+#ifdef USEHASH
+    // The standard hash function for uint64_t's, as well as a hash table used
+    // to help identify duplicate bit encodings of vectors.
+    std::hash<uint64_t> f;
+    std::unordered_set<uint64_t> hashTable;
+#endif
+
+    // A list of all bit-encoded eigenvectors.
     std::vector<std::vector<uint64_t>> allVectors;
 
     for (auto& it : this->eigenvectorMap_)
@@ -1632,8 +1640,28 @@ void Genus<R,F>::assign_eigenvector_pivots(void)
                 ++n;
             }
 
-            // Move our encoding into a vector.
+#ifdef USEHASH
+            // Compute a hash of the bit sequence associated to vec.
+            uint64_t h = 0;
+            for (uint64_t limb : nonzero)
+            {
+                h = (h << 12) ^ f(h ^ (71 * limb));
+            }
+
+            // If the hash not already in the table, add it, then add the
+            // encoded vector to the list as well. This is to avoid duplicate
+            // vector encodings appearing in the list of all vectors.
+            //
+            // TODO: Probably want to avoid using hashes to distinguish the
+            // bit sequences here, just in case there's a hash collision.
+            if (hashTable.count(h) == 0)
+            {
+                hashTable.insert(h);
+                allVectors.push_back(std::move(nonzero));
+            }
+#else
             allVectors.push_back(std::move(nonzero));
+#endif
         }
     }
 
