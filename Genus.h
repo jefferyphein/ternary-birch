@@ -21,6 +21,7 @@
 #include "HeckeOperator.h"
 #include "Eigenvector.h"
 #include "Math.h"
+#include "SetCover.h"
 
 template<typename R, typename F>
 class GenusRep
@@ -201,6 +202,7 @@ private:
     /* A function used to compute the pivots used for computing eigenvalues.
      * This is an implementation of a greedy algorithm. */
     void assign_eigenvector_pivots_greedy(void);
+    void assign_eigenvector_pivots(void);
 
     /* A map of Eigenvectors, associated by conductors. */
     std::map<Character<R,F>, std::vector<Eigenvector>> eigenvectorMap_;
@@ -1093,7 +1095,8 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         // called based upon criteria such as the number of vectors, how many
         // coordinates they have, the number of eigenvalues to be computed,
         // their size, etc.
-        this->assign_eigenvector_pivots_greedy();
+        this->assign_eigenvector_pivots();
+        //this->assign_eigenvector_pivots_greedy();
     }
 
     // Get the bad primes.
@@ -1590,6 +1593,93 @@ void Genus<R,F>::import_eigenvectors(const std::string& filename)
             if (relPos != -1)
             {
                 this->absolutePosition_[cond][relPos] = absPos;
+            }
+        }
+    }
+}
+
+template<typename R, typename F>
+void Genus<R,F>::assign_eigenvector_pivots(void)
+{
+    // How many int64_t's are needed to encode the supplied eigenvectors
+    // based on which positions are zero (0) or nonzero (1).
+    int64_t numLimbs = 1 + (this->genusVec_.size() - 1) / 64;
+
+    std::vector<std::vector<uint64_t>> allVectors;
+
+    for (auto& it : this->eigenvectorMap_)
+    {
+        const R& cond = it.first.conductor();
+        const std::vector<int64_t>& absPos = this->absolutePosition_[cond];
+        for (auto& vec : it.second)
+        {
+            // A vector of int64_t's representing whether the coefficients
+            // of an eigenvector are zero or nonzero.
+            std::vector<uint64_t> nonzero(numLimbs, 0);
+
+            const std::vector<int64_t>& coeffs = vec.coefficients();
+
+            // Set the appropriate bit to 1 if the coefficient at the
+            // corresponding position is nonzero.
+            int64_t n = 0;
+            for (int64_t value : coeffs)
+            {
+                if (value != 0)
+                {
+                    int64_t pos = absPos[n];
+                    nonzero[pos / 64] |= (1L << (pos % 64));
+                }
+                ++n;
+            }
+
+            // Move our encoding into a vector.
+            allVectors.push_back(std::move(nonzero));
+        }
+    }
+
+    int64_t numEigenvectors = allVectors.size();
+
+    // Determine the eigenvector pivots.
+    SetCover setcover(this->genusVec_.size(), allVectors, SetCover::METHOD_KINDA_GREEDY);
+    this->eigenvectorPivots_ = setcover.positions();
+
+    // Initialize pivot map values to -1.
+    for (int64_t n = 0; n < numEigenvectors; n++)
+    {
+        this->pivotMap_[n] = -1;
+    }
+
+    // Assign a pivot to each eigenvector.
+    for (int64_t value : this->eigenvectorPivots_)
+    {
+        // Recover the genus rep object for this pivot value.
+        QuadFormPtr q = this->genusVec_[value];
+        const GenusRep<R,F>& rep = this->find_genus_rep(q);
+
+        for (auto& it : this->eigenvectorMap_)
+        {
+            const R& cond = it.first.conductor();
+            for (auto& vec : it.second)
+            {
+                // Skip this vector if already assigned a pivot.
+                if (this->pivotMap_[vec.index()] != -1)
+                {
+                    continue;
+                }
+
+                // Skip this pivot if it doesn't contribute to this vector.
+                int64_t pos = rep.position(cond);
+                if (pos == -1)
+                {
+                    continue;
+                }
+
+                // Assign the pivot if the coefficient at its relative position
+                // is nonzero.
+                if (vec.at(pos) != 0)
+                {
+                    this->pivotMap_[vec.index()] = value;
+                }
             }
         }
     }

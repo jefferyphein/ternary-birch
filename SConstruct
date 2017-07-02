@@ -17,6 +17,7 @@ srcs = Split('''
     MathZZ.cpp
     NeighborIteratorZZ.cpp
     QuadFormZZ.cpp
+    SetCover.cpp
     SparseMatrix.cpp
 ''')
 
