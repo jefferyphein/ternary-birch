@@ -201,7 +201,6 @@ private:
 
     /* A function used to compute the pivots used for computing eigenvalues.
      * This is an implementation of a greedy algorithm. */
-    void assign_eigenvector_pivots_greedy(void);
     void assign_eigenvector_pivots(void);
 
     /* A map of Eigenvectors, associated by conductors. */
@@ -1096,7 +1095,6 @@ void Genus<R,F>::compute_eigenvalues(const std::vector<R>& ps, int64_t numThread
         // coordinates they have, the number of eigenvalues to be computed,
         // their size, etc.
         this->assign_eigenvector_pivots();
-        //this->assign_eigenvector_pivots_greedy();
     }
 
     // Get the bad primes.
@@ -1605,13 +1603,6 @@ void Genus<R,F>::assign_eigenvector_pivots(void)
     // based on which positions are zero (0) or nonzero (1).
     int64_t numLimbs = 1 + (this->genusVec_.size() - 1) / 64;
 
-#ifdef USEHASH
-    // The standard hash function for uint64_t's, as well as a hash table used
-    // to help identify duplicate bit encodings of vectors.
-    std::hash<uint64_t> f;
-    std::unordered_set<uint64_t> hashTable;
-#endif
-
     // A list of all bit-encoded eigenvectors.
     std::vector<std::vector<uint64_t>> allVectors;
 
@@ -1640,28 +1631,7 @@ void Genus<R,F>::assign_eigenvector_pivots(void)
                 ++n;
             }
 
-#ifdef USEHASH
-            // Compute a hash of the bit sequence associated to vec.
-            uint64_t h = 0;
-            for (uint64_t limb : nonzero)
-            {
-                h = (h << 12) ^ f(h ^ (71 * limb));
-            }
-
-            // If the hash not already in the table, add it, then add the
-            // encoded vector to the list as well. This is to avoid duplicate
-            // vector encodings appearing in the list of all vectors.
-            //
-            // TODO: Probably want to avoid using hashes to distinguish the
-            // bit sequences here, just in case there's a hash collision.
-            if (hashTable.count(h) == 0)
-            {
-                hashTable.insert(h);
-                allVectors.push_back(std::move(nonzero));
-            }
-#else
             allVectors.push_back(std::move(nonzero));
-#endif
         }
     }
 
@@ -1710,111 +1680,6 @@ void Genus<R,F>::assign_eigenvector_pivots(void)
                 }
             }
         }
-    }
-}
-
-template<typename R, typename F>
-void Genus<R,F>::assign_eigenvector_pivots_greedy(void)
-{
-    // A vector which will be populated with eigenvector pivots. These
-    // correspond to the row of the Hecke operator which needs to be computed
-    // in order to generate all eigenvalue for all eigenvectors.
-    this->eigenvectorPivots_.clear();
-
-    // An unordered map of the eigenvector indices which are known to be
-    // accounted for by the eigenvectorPivots_ vector.
-    std::unordered_set<int64_t> accountedFor;
-
-    // The total number of eigenvectors.
-    size_t numEigenvectors = this->eigenvalueMap_.size();
-
-    // The number of eigenvectors we hope to account for during this iteration.
-    int64_t goal = numEigenvectors;
-
-    while (accountedFor.size() < numEigenvectors)
-    {
-        // A vector containing the number of nonzero entries at each absolute
-        // position across all eigenvectors. This will be used to identify which
-        // genus rep(s) will be used to compute eigenvalues.
-        std::vector<int64_t> nonzero(this->genusVec_.size(), 0);
-
-        for (auto& it : this->eigenvectorMap_)
-        {
-            const R& cond = it.first.conductor();
-            const std::vector<int64_t>& absPos = this->absolutePosition_[cond];
-            for (auto& vec : it.second)
-            {
-                if (accountedFor.count(vec.index()) > 0) { continue; }
-
-                const auto& coeffs = vec.coefficients();
-                int64_t len = coeffs.size();
-                for (int64_t k = 0; k < len; k++)
-                {
-                    if (coeffs[k] != 0)
-                    {
-                        ++nonzero[absPos[k]];
-                        if (nonzero[absPos[k]] == goal)
-                        {
-                            // Push the pivot onto the vector.
-                            this->eigenvectorPivots_.push_back(absPos[k]);
-
-                            // Assign this pivot to all remaining vectors.
-                            for (size_t n = 0; n < numEigenvectors; n++)
-                            {
-                                if (accountedFor.count(n) == 0)
-                                {
-                                    this->pivotMap_[n] = absPos[k];
-                                }
-                            }
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Determine the best (greedy) pivot position to include.
-        auto maxelt = std::max_element(nonzero.begin(), nonzero.end());
-        int64_t bestIndex = std::distance(nonzero.begin(), maxelt);
-        QuadFormPtr qq = this->genusVec_[bestIndex];
-        const GenusRep<R,F>& rep = this->find_genus_rep(qq);
-
-        for (auto& it : this->eigenvectorMap_)
-        {
-            const R& cond = it.first.conductor();
-
-            int64_t relPos = rep.position(cond);
-
-            for (auto& vec : it.second)
-            {
-                // Skip this vector if it has already been assigned a pivot.
-                if (accountedFor.count(vec.index()) > 0)
-                {
-                    continue;
-                }
-
-                // Skip this vector if the character does not allow it to be
-                // accounted for.
-                if (relPos == -1)
-                {
-                    continue;
-                }
-
-                // If the vector has a nonzero value in the best position, add
-                // it to the accounted for set.
-                if (vec[relPos] != 0)
-                {
-                    accountedFor.insert(vec.index());
-                    this->pivotMap_[vec.index()] = bestIndex;
-                }
-            }
-        }
-
-        // Add this pivot to the list.
-        this->eigenvectorPivots_.push_back(bestIndex);
-
-        // Update the goal.
-        goal = numEigenvectors - accountedFor.size();
     }
 }
 
