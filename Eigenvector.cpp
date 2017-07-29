@@ -14,9 +14,9 @@ std::istream& operator>>(std::istream& is, Eigenvector& vec)
 
 std::ostream& operator<<(std::ostream& os, const Eigenvector& vec)
 {
-    for (int64_t k = 0; k < vec.dim_; k++)
+    for (int64_t value : vec.coefficients_)
     {
-        os << vec.coefficients_[k] << " ";
+        os << value << " ";
     }
     return os;
 }
