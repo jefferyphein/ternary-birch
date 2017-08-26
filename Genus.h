@@ -87,6 +87,8 @@ public:
 
     void compute_hecke_operators(const R& p, int64_t numThreads=0);
 
+    std::vector<R> conductors(const R& p) const;
+
     HeckePtr hecke_operator(const R& p, const R& cond) const;
     HeckePtr hecke_operator(const R& p, const Character<R,F>& chi) const;
 
@@ -882,6 +884,21 @@ void Genus<R,F>::compute_hecke_operators(const R& p, int64_t numThreads)
             }
         }
     }
+}
+
+template<typename R, typename F>
+std::vector<R> Genus<R,F>::conductors(const R& p) const
+{
+    std::vector<R> conds;
+    for (const auto& pair : this->heckeMap_)
+    {
+        auto it = pair.second.find(p);
+        if (it != pair.second.end())
+        {
+            conds.push_back(pair.first);
+        }
+    }
+    return std::move(conds);
 }
 
 template<typename R, typename F>
