@@ -1,0 +1,4 @@
+SUBDIRS = src
+AM_LDFLAGS = -lm -O3 -fPIC
+ACLOCAL_AMFLAGS = -lm -O3 -I m4
+AM_CXXFLAGS = -g -O3
