@@ -1,0 +1,11 @@
+*.o
+*.la
+m4
+config.status
+*.swp
+*.log
+*.data
+autom4te.cache
+libtool
+src/.deps
+temp
