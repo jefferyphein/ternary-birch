@@ -68,6 +68,7 @@ int main(int argc, char **argv)
     //genus2.hecke_matrix_sparse(7);
     //genus2.hecke_matrix_sparse(101);
     //genus2.hecke_matrix_sparse(373);
+    //genus2.hecke_matrix_dense(373);
     genus2.hecke_matrix_dense(8191);
 
     return EXIT_SUCCESS;
