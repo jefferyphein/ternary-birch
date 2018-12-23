@@ -639,6 +639,7 @@ private:
             size_t dim2 = dim * dim;
             const std::vector<size_t>& auts = this->num_auts[k];
 
+            // Copy upper diagonal matrix to the lower diagonal.
             for (size_t start=0, row=0; start<dim2; start+=dim+1, row++)
             {
                 int row_auts = auts[row];
@@ -647,18 +648,19 @@ private:
                     if (matrix[src])
                     {
                         int col_auts = auts[col];
-                        //if (col_auts == row_auts)
-                        //{
-                        //    matrix[dst] = matrix[src];
-                        //}
-                        //else
-                        //{
+                        if (col_auts == row_auts)
+                        {
+                            matrix[dst] = matrix[src];
+                        }
+                        else
+                        {
                             matrix[dst] = matrix[src] * col_auts / row_auts;
-                        //}
+                        }
                     }
                 }
             }
 
+            // Move the matrix in the corresponding entry in the map.
             matrices[this->conductors[k]] = std::move(hecke_matrices[k]);
         }
         return matrices;
