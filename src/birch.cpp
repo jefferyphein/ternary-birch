@@ -62,12 +62,12 @@ int main(int argc, char **argv)
     //Z64_QuadForm q64 = birch_util::convert_QuadForm<Z,Z64>(q);
     //Z64_Genus genus2(q64, symbols64);
 
-    genus2.hecke_matrix_sparse(2);
-    genus2.hecke_matrix_sparse(3);
-    genus2.hecke_matrix_sparse(5);
-    genus2.hecke_matrix_sparse(7);
-    genus2.hecke_matrix_sparse(101);
-    genus2.hecke_matrix_sparse(373);
+    //genus2.hecke_matrix_sparse(2);
+    //genus2.hecke_matrix_sparse(3);
+    //genus2.hecke_matrix_sparse(5);
+    //genus2.hecke_matrix_sparse(7);
+    //genus2.hecke_matrix_sparse(101);
+    //genus2.hecke_matrix_sparse(373);
     genus2.hecke_matrix_dense(8191);
 
     return EXIT_SUCCESS;

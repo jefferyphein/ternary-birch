@@ -382,7 +382,8 @@ private:
         else
             GF = std::make_shared<W16_Fp>((W16)prime, this->seed(), true);
 
-        std::vector<W64> all_spin_vals(prime+1);
+        std::vector<W64> all_spin_vals;
+        all_spin_vals.reserve(prime+1);
 
         std::vector<std::vector<int>> rowdata;
         for (int dim : this->dims)
@@ -417,7 +418,7 @@ private:
                 {
                     spin_vals = this->spinor->norm(foo.q, foo.s, p);
                 }
-                else
+                else if (r > n)
                 {
                     const GenusRep<R>& rep = this->hash->get(r);
                     foo.s = cur.s * foo.s;
@@ -447,8 +448,9 @@ private:
 
                     spin_vals = this->spinor->norm(mother.q, foo.s, scalar);
                 }
+                else continue;
 
-                all_spin_vals[t] = (r << num_primes) | spin_vals;
+                all_spin_vals.push_back((r << num_primes) | spin_vals);
             }
 
             for (size_t k=0; k<num_conductors; k++)
@@ -489,6 +491,8 @@ private:
                 // Update indptr
                 indptr[k][npos+1] = indptr[k][npos] + nnz;
             }
+
+            all_spin_vals.clear();
         }
 
         std::map<R,std::vector<std::vector<int>>> csr_matrices;
@@ -521,7 +525,8 @@ private:
         }
 
         W16 prime = birch_util::convert_Integer<R,W16>(p);
-        std::vector<W64> all_spin_vals(prime+1);
+        std::vector<W64> all_spin_vals;
+        all_spin_vals.reserve(prime+1);
 
         std::shared_ptr<W16_Fp> GF;
         if (prime == 2)
@@ -555,7 +560,7 @@ private:
                 {
                     spin_vals = this->spinor->norm(foo.q, foo.s, p);
                 }
-                else
+                else if (r > n)
                 {
                     const GenusRep<R>& rep = this->hash->get(r);
                     foo.s = cur.s * foo.s;
@@ -585,8 +590,9 @@ private:
 
                     spin_vals = this->spinor->norm(mother.q, foo.s, scalar);
                 }
+                else continue;
 
-                all_spin_vals[t] = (r << num_primes) | spin_vals;
+                all_spin_vals.push_back((r << num_primes) | spin_vals);
             }
 
             for (size_t k=0; k<num_conductors; k++)
@@ -608,6 +614,8 @@ private:
 
                 hecke_ptr[k] += this->dims[k];
             }
+
+            all_spin_vals.clear();
         }
 
         // Move all of the Hecke matrices into an associative map and return.
