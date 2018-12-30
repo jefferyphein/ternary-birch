@@ -41,7 +41,6 @@ public:
             seed = rd();
         }
 
-        //std::shared_ptr<Genus<R>> genus = std::make_shared<Genus<R>>();
         this->disc = q.discriminant();
         this->seed_ = seed;
 
