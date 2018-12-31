@@ -45,6 +45,21 @@ public:
         return temp;
     }
 
+    Isometry<R> transpose(void) const
+    {
+        Isometry<R> temp;
+        temp.a11 = this->a11;
+        temp.a12 = this->a21;
+        temp.a13 = this->a31;
+        temp.a21 = this->a12;
+        temp.a22 = this->a22;
+        temp.a23 = this->a32;
+        temp.a31 = this->a13;
+        temp.a32 = this->a23;
+        temp.a33 = this->a33;
+        return temp;
+    }
+
     Isometry<R> operator*(const Isometry<R>& s) const
     {
         Isometry<R> temp;

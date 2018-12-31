@@ -42,6 +42,29 @@ public:
         return this->keys_[index];
     }
 
+    bool exists(const Key& key) const
+    {
+        W64 value = std::hash<Key>{}(key);
+        size_t index = value & this->mask;
+        while (1)
+        {
+            Z64 offset = this->keyptr[index];
+            if (offset == -1)
+            {
+                return false;
+            }
+
+            if (key == this->keys_[offset])
+            {
+                return true;
+            }
+
+            index = (index + 1) & this->mask;
+        }
+
+        return false;
+    }
+
     size_t indexof(const Key& key) const
     {
         W64 value = std::hash<Key>{}(key);

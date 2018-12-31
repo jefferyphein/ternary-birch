@@ -145,18 +145,69 @@ public:
         return rep;
     }
 
+    Vector3<R> transform_vector(const GenusRep<T>& src, const GenusRep<T>& dst, Vector3<R> vec)
+    {
+        Vector3<T> temp;
+        temp.x = GF->mod(vec.x);
+        temp.y = GF->mod(vec.y);
+        temp.z = GF->mod(vec.z);
+
+        R p = GF->prime();
+
+        Isometry<T> sinv = dst.s.inverse(p);
+        temp = sinv * temp;
+
+        #ifdef DEBUG
+        assert( temp.x % p == 0 );
+        assert( temp.y % p == 0 );
+        assert( temp.z % p == 0 );
+        #endif
+
+        temp.x /= p;
+        temp.y /= p;
+        temp.z /= p;
+
+        vec.x = GF->mod(temp.x);
+        vec.y = GF->mod(temp.y);
+        vec.z = GF->mod(temp.z);
+        if (vec.z != 0)
+        {
+            R inv = GF->inverse(vec.z);
+            vec.x = GF->mod(GF->mul(vec.x, inv));
+            vec.y = GF->mod(GF->mul(vec.y, inv));
+            vec.z = 1;
+        }
+        else if (vec.y != 0)
+        {
+            R inv = GF->inverse(vec.y);
+            vec.x = GF->mod(GF->mul(vec.x, inv));
+            vec.y = 1;
+        }
+        else
+        {
+            vec.x = 1;
+        }
+
+        return vec;
+    }
+
     QuadForm<T> get_neighbor(R t, Isometry<T>& s) const
+    {
+        Vector3<R> vec = this->isotropic_vector(t);
+        return build_neighbor(vec, s);
+    }
+
+    QuadForm<T> build_neighbor(Vector3<R>& vec2, Isometry<T>& s) const
     {
         T p = GF->prime();
         T pp = p*p;
-
-        Vector3<R> iso = this->isotropic_vector(t);
-        Vector3<T> vec;
-        vec.x = GF->mod(iso.x);
-        vec.y = GF->mod(iso.y);
-        vec.z = GF->mod(iso.z);
-
         T aa, bb, cc, ff, gg, hh;
+
+        // Convert isotropic vector into the correct domain.
+        Vector3<T> vec;
+        vec.x = GF->mod(vec2.x);
+        vec.y = GF->mod(vec2.y);
+        vec.z = GF->mod(vec2.z);
 
         if (vec.x > (p>>1)) vec.x -= p;
         if (vec.y > (p>>1)) vec.y -= p;
