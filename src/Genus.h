@@ -179,6 +179,7 @@ public:
         // Create the lookup table values for each genus rep at each conductor.
         size_t genus_size = this->hash->size();
         this->lut_positions.resize(num_conductors, std::vector<int>(genus_size, -1));
+        this->num_auts.resize(num_conductors);
 
         // The genus rep isometries were initialized only to contain the
         // isometry between the parent and its child, we now want to update
@@ -230,11 +231,13 @@ public:
                 }
             }
 
+            int num = QuadForm<R>::num_automorphisms(rep.q);
             for (size_t k=0; k<num_conductors; k++)
             {
                 if (!ignore[k])
                 {
                     this->lut_positions[k][n] = this->dims[k];
+                    this->num_auts[k].push_back(num);
                 }
                 this->dims[k] += (ignore[k] ? 0 : 1);
             }
@@ -264,6 +267,9 @@ public:
 
         // Copy dimensions.
         genus.dims = src.dims;
+
+        // Copy automorphisms counts.
+        genus.num_auts = src.num_auts;
 
         // Copy lookup table dimensions.
         genus.lut_positions = src.lut_positions;
@@ -340,6 +346,7 @@ private:
     std::vector<R> prime_divisors;
     std::vector<R> conductors;
     std::vector<size_t> dims;
+    std::vector<std::vector<size_t>> num_auts;
     std::vector<std::vector<int>> lut_positions;
     Z mass_x24;
     std::unique_ptr<HashMap<W16>> spinor_primes;
@@ -381,7 +388,8 @@ private:
         else
             GF = std::make_shared<W16_Fp>((W16)prime, this->seed(), true);
 
-        std::vector<W64> all_spin_vals(prime+1);
+        std::vector<W64> all_spin_vals;
+        all_spin_vals.reserve(prime+1);
 
         std::vector<std::vector<int>> rowdata;
         for (int dim : this->dims)
@@ -447,7 +455,7 @@ private:
                     spin_vals = this->spinor->norm(mother.q, foo.s, scalar);
                 }
 
-                all_spin_vals[t] = (r << num_primes) | spin_vals;
+                all_spin_vals.push_back((r << num_primes) | spin_vals);
             }
 
             for (size_t k=0; k<num_conductors; k++)
@@ -488,6 +496,8 @@ private:
                 // Update indptr
                 indptr[k][npos+1] = indptr[k][npos] + nnz;
             }
+
+            all_spin_vals.clear();
         }
 
         std::map<R,std::vector<std::vector<int>>> csr_matrices;
@@ -520,7 +530,8 @@ private:
         }
 
         W16 prime = birch_util::convert_Integer<R,W16>(p);
-        std::vector<W64> all_spin_vals(prime+1);
+        std::vector<W64> all_spin_vals;
+        all_spin_vals.reserve(prime+1);
 
         std::shared_ptr<W16_Fp> GF;
         if (prime == 2)
@@ -554,7 +565,7 @@ private:
                 {
                     spin_vals = this->spinor->norm(foo.q, foo.s, p);
                 }
-                else
+                else if (r > n)
                 {
                     const GenusRep<R>& rep = this->hash->get(r);
                     foo.s = cur.s * foo.s;
@@ -584,8 +595,9 @@ private:
 
                     spin_vals = this->spinor->norm(mother.q, foo.s, scalar);
                 }
+                else continue;
 
-                all_spin_vals[t] = (r << num_primes) | spin_vals;
+                all_spin_vals.push_back((r << num_primes) | spin_vals);
             }
 
             for (size_t k=0; k<num_conductors; k++)
@@ -607,12 +619,43 @@ private:
 
                 hecke_ptr[k] += this->dims[k];
             }
+
+            all_spin_vals.clear();
         }
 
-        // Move all of the Hecke matrices into an associative map and return.
+        // Copy the upper diagonal entries to the lower diagonal using the
+        // Hermitian symmetry property and then move the matrix into an
+        // associatively map before returning.
         std::map<R,std::vector<int>> matrices;
         for (size_t k=0; k<num_conductors; k++)
         {
+            std::vector<int>& matrix = hecke_matrices[k];
+            size_t dim = this->dims[k];
+            size_t dim2 = dim * dim;
+            const std::vector<size_t>& auts = this->num_auts[k];
+
+            // Copy upper diagonal matrix to the lower diagonal.
+            for (size_t start=0, row=0; start<dim2; start+=dim+1, row++)
+            {
+                int row_auts = auts[row];
+                for (size_t dst=start+dim, src=start+1, col=row+1; col<dim; src++, col++, dst+=dim)
+                {
+                    if (matrix[src])
+                    {
+                        int col_auts = auts[col];
+                        if (col_auts == row_auts)
+                        {
+                            matrix[dst] = matrix[src];
+                        }
+                        else
+                        {
+                            matrix[dst] = matrix[src] * col_auts / row_auts;
+                        }
+                    }
+                }
+            }
+
+            // Move the matrix in the corresponding entry in the map.
             matrices[this->conductors[k]] = std::move(hecke_matrices[k]);
         }
         return matrices;
