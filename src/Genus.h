@@ -576,9 +576,6 @@ private:
 
                 size_t r = this->hash->indexof(foo);
 
-                W16_Vector3 result = manager.transform_vector(cur, foo, vec);
-                vector_hash[r].add(result);
-
                 #ifdef DEBUG
                 assert( r < this->size() );
                 #endif
@@ -590,6 +587,9 @@ private:
                 }
                 else if (r > n)
                 {
+                    W16_Vector3 result = manager.transform_vector(cur, foo, vec);
+                    vector_hash[r].add(result);
+
                     const GenusRep<R>& rep = this->hash->get(r);
                     foo.s = cur.s * foo.s;
                     R scalar = p;
