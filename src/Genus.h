@@ -338,6 +338,10 @@ public:
 
     std::map<R,std::vector<std::vector<int>>> hecke_matrix_sparse(const R& p) const
     {
+        if (this->disc % p == 0)
+        {
+            throw std::invalid_argument("Prime must not divide the discriminant.");
+        }
         return this->hecke_matrix_sparse_internal(p);
     }
 
