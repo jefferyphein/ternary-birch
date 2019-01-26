@@ -18,12 +18,20 @@ The code in this repository is based on my Ph.D thesis and is an ongoing project
 
 ## Installation
 
-For a standard build on a system with autotools:
+This can be installed either as a C++ library (libbirch.so) or compiled directly for use within a Sage session.
+
+### As a C++ library
+
+To use as a C++ library on a standard build on a system with autotools:
 
     ./autogen.sh
     ./configure --prefix=DIR
     make
     make install
+    
+### As a Sage module
+
+    See [Usage](#usage)
     
 ## Usage
 
