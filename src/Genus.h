@@ -541,6 +541,11 @@ private:
 
         const GenusRep<R>& mother = this->hash->keys()[0];
         size_t num_reps = this->size();
+
+        // Create hash tables for storing isotropic vectors to be skipped
+        // at later iterations.
+        std::vector<HashMap<W16_Vector3>> vector_hash(num_reps);
+
         for (size_t n=0; n<num_reps; n++)
         {
             const GenusRep<R>& cur = this->hash->get(n);
@@ -548,7 +553,22 @@ private:
 
             for (W16 t=0; t<=prime; t++)
             {
-                GenusRep<R> foo = manager.get_reduced_neighbor_rep(t);
+                GenusRep<R> foo;
+                W16_Vector3 vec = manager.isotropic_vector(t);
+                vec.x = GF->mod(vec.x);
+                vec.y = GF->mod(vec.y);
+                vec.z = GF->mod(vec.z);
+
+                // If this vector has already been identified, skip it. This
+                // avoids unnecessarily computing the neighbor, reducing it,
+                // and testing for isometry. The Hermitian symmetry property
+                // of the Hecke matrix will account for this once we finish
+                // processing neighbors.
+                if (vector_hash[n].exists(vec)) continue;
+
+                // Build the neighbor and reduce it.
+                foo.q = manager.build_neighbor(vec, foo.s);
+                foo.q = QuadForm<R>::reduce(foo.q, foo.s);
 
                 #ifdef DEBUG
                 assert( foo.s.is_isometry(cur.q, foo.q, p*p) );
@@ -567,6 +587,9 @@ private:
                 }
                 else if (r > n)
                 {
+                    W16_Vector3 result = manager.transform_vector(cur, foo, vec);
+                    vector_hash[r].add(result);
+
                     const GenusRep<R>& rep = this->hash->get(r);
                     foo.s = cur.s * foo.s;
                     R scalar = p;
