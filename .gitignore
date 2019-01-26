@@ -13,3 +13,16 @@ autom4te.cache
 libtool
 src/.deps
 temp
+
+# Autotools stuff
+COPYING
+INSTALL
+ar-lib
+compile
+Makefile
+config.guess
+config.sub
+depcomp
+install-sh
+ltmain.sh
+missing
