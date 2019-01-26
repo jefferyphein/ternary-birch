@@ -31,7 +31,7 @@ To use as a C++ library on a standard build on a system with autotools:
     
 ### As a Sage module
 
-    See [Usage](#usage)
+See [Usage](#usage)
     
 ## Usage
 
