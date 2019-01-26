@@ -1,4 +1,8 @@
 *.o
+.libs
+*.lo
+src/tags
+perf.data
 *.la
 m4
 config.status
