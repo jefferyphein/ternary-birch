@@ -1,4 +1,4 @@
-AC_INIT([birch],[0.2.0])
+AC_INIT([birch],[2.0.0])
 AM_INIT_AUTOMAKE([-Wall -Werror subdir-objects])
 AC_PROG_CXX
 AM_PROG_AR
