@@ -82,18 +82,18 @@ With a genus object constructed, isometries used within the ``hecke_matrix`` fun
     def trivial_representation(isometry):
          return 1
 
+    import numpy as np
     g = BirchGenus(11)
     dim = g.dimensions()[1]
-    m = np.zeros((dim, dim), dtype=np.int32)
-    for entry for g.isometry_sequence(31):
-        row = s['src']
-        col = s['dst']
-        S[row][col] += trivial_representation(entry)
-    print m
+    mat = np.zeros((dim, dim), dtype=np.int32)
+    for entry in g.isometry_sequence(31):
+        row = entry['src']
+        col = entry['dst']
+        mat[row][col] += trivial_representation(entry)
 
 Compare this to:
 
-    sage: g.hecke_matrix(31, 1)
+    sage: mat == g.hecke_matrix(31, 1)
 
 ### Resuming sessions using seeds
 
