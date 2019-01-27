@@ -33,7 +33,7 @@ class Genus
 public:
     Genus() = default;
 
-    Genus(const QuadForm<R>& q, const std::vector<PrimeSymbol<R>>& symbols, W64 seed = 0)
+    Genus(const QuadForm<R>& q, const std::vector<PrimeSymbol<R>>& symbols, W64 seed=0)
     {
         if (seed == 0)
         {
@@ -245,65 +245,66 @@ public:
     }
 
     template<typename T>
-    static Genus<T> convert(const Genus<R>& src)
+    Genus(const Genus<T>& src)
     {
-        //std::shared_ptr<Genus<T>> genus = std::make_shared<Genus<T>>();
-        Genus<T> genus;
-
         // Convert the discriminant.
-        genus.disc = birch_util::convert_Integer<R,T>(src.disc);
+        this->disc = birch_util::convert_Integer<T,R>(src.disc);
 
         // Convert the prime divisors.
-        for (const R& p : src.prime_divisors)
+        for (const T& p : src.prime_divisors)
         {
-            genus.prime_divisors.push_back(birch_util::convert_Integer<R,T>(p));
+            this->prime_divisors.push_back(birch_util::convert_Integer<T,R>(p));
         }
 
         // Convert the conductors.
-        for (const R& cond : src.conductors)
+        for (const T& cond : src.conductors)
         {
-            genus.conductors.push_back(birch_util::convert_Integer<R,T>(cond));
+            this->conductors.push_back(birch_util::convert_Integer<T,R>(cond));
         }
 
         // Copy dimensions.
-        genus.dims = src.dims;
+        this->dims = src.dims;
 
         // Copy automorphisms counts.
-        genus.num_auts = src.num_auts;
+        this->num_auts = src.num_auts;
 
         // Copy lookup table dimensions.
-        genus.lut_positions = src.lut_positions;
+        this->lut_positions = src.lut_positions;
 
         // Copy mass.
-        genus.mass_x24 = src.mass_x24;
+        this->mass_x24 = src.mass_x24;
 
         // Build a copy of the spinor primes hash table.
-        genus.spinor_primes = std::unique_ptr<HashMap<W16>>(new HashMap<W16>(src.spinor_primes->size()));
+        this->spinor_primes = std::unique_ptr<HashMap<W16>>(new HashMap<W16>(src.spinor_primes->size()));
         for (W16 x : src.spinor_primes->keys())
         {
-            genus.spinor_primes->add(x);
+            this->spinor_primes->add(x);
         }
 
         // Build a copy of the genus representatives hash table.
-        genus.hash = std::unique_ptr<HashMap<GenusRep<T>>>(new HashMap<GenusRep<T>>(src.hash->size()));
-        for (const GenusRep<R>& rep : src.hash->keys())
+        this->hash = std::unique_ptr<HashMap<GenusRep<R>>>(new HashMap<GenusRep<R>>(src.hash->size()));
+        for (const GenusRep<T>& rep : src.hash->keys())
         {
-            genus.hash->add(birch_util::convert_GenusRep<R,T>(rep));
+            this->hash->add(birch_util::convert_GenusRep<T,R>(rep));
         }
 
         // Create Spinor class.
-        std::vector<T> primes;
+        std::vector<R> primes;
         primes.reserve(src.spinor->primes().size());
-        for (const R& p : src.spinor->primes())
+        for (const T& p : src.spinor->primes())
         {
-            primes.push_back(birch_util::convert_Integer<R,T>(p));
+            primes.push_back(birch_util::convert_Integer<T,R>(p));
         }
-        genus.spinor = std::unique_ptr<Spinor<T>>(new Spinor<T>(primes));
+        this->spinor = std::unique_ptr<Spinor<R>>(new Spinor<R>(primes));
 
         // Copy seed.
-        genus.seed_ = src.seed_;
+        this->seed_ = src.seed_;
+    }
 
-        return genus;
+    template<typename T>
+    static Genus<T> convert(const Genus<R>& src)
+    {
+        return Genus<T>(src);
     }
 
     size_t size(void) const
@@ -343,6 +344,16 @@ public:
             throw std::invalid_argument("Prime must not divide the discriminant.");
         }
         return this->hecke_matrix_sparse_internal(p);
+    }
+
+    const GenusRep<R>& representative(size_t n) const
+    {
+        return this->hash->get(n);
+    }
+
+    size_t indexof(const GenusRep<R>& rep) const
+    {
+        return this->hash->indexof(rep);
     }
 
 private:
