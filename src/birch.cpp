@@ -1,5 +1,6 @@
 #include "birch.h"
 #include "Genus.h"
+#include "IsometrySequence.h"
 
 int main(int argc, char **argv)
 {
@@ -35,9 +36,9 @@ int main(int argc, char **argv)
     Z_QuadForm q = Z_QuadForm::get_quad_form(symbols);
 
     Z_Genus genus1(q, symbols);
-    Z64_Genus genus2 = Z_Genus::convert<Z64>(genus1);
+    std::shared_ptr<Z64_Genus> genus2 = std::make_shared<Z64_Genus>(genus1);
 
-    genus2.hecke_matrix_dense(8191);
+    genus2->hecke_matrix_dense(8191);
 
     return EXIT_SUCCESS;
 }

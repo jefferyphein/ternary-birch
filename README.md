@@ -18,12 +18,20 @@ The code in this repository is based on my Ph.D thesis and is an ongoing project
 
 ## Installation
 
-For a standard build on a system with autotools:
+This can be installed either as a C++ library (libbirch.so) or compiled directly for use within a Sage session.
+
+### As a C++ library
+
+To use as a C++ library on a standard build on a system with autotools:
 
     ./autogen.sh
     ./configure --prefix=DIR
     make
     make install
+    
+### As a Sage module
+
+See [Usage](#usage)
     
 ## Usage
 
@@ -31,9 +39,9 @@ This library can be used within C++ applications, but is specifically designed t
 
 ### Loading within Sage
 
-To use within Sage, please run the provided [src/py_birch.pyx](https://github.com/jefferyphein/ternary-birch/blob/master/src/py_birch.pyx) file within your Sage environment. For example:
+To use within Sage, run the provided [src/py_birch.pyx](https://github.com/jefferyphein/ternary-birch/blob/master/src/py_birch.pyx) Cython wrapper within Sage environment. You'll need to have the current directory within Sage within the ``src`` directory.
 
-    sage: %runfile src/py_birch.pyx
+    sage: %runfile py_birch.pyx
 
 ### Constructing the genus:
 
@@ -66,6 +74,26 @@ Additionally, the underlying arithmetic within ``hecke_matrix`` is done using mu
     sage: D = g.hecke_matrix(73, 11*17, precise=False)
 
 **NOTE: While using native 64-bit precision can be considerably faster, it can overflow quite dramatically for large conductors and/or large primes. Use with caution!**
+
+### Accessing isometries for building custom Hecke matrices
+
+With a genus object constructed, isometries used within the ``hecke_matrix`` functions can be directly accessed via the ``isometry_sequence`` member function. This data can then be used to manually compute custom Hecke operators with a user defined representation. For example, in Sage:
+
+    def trivial_representation(isometry):
+         return 1
+
+    g = BirchGenus(11)
+    dim = g.dimensions()[1]
+    m = np.zeros((dim, dim), dtype=np.int32)
+    for entry for g.isometry_sequence(31):
+        row = s['src']
+        col = s['dst']
+        S[row][col] += trivial_representation(entry)
+    print m
+
+Compare this to:
+
+    sage: g.hecke_matrix(31, 1)
 
 ### Resuming sessions using seeds
 

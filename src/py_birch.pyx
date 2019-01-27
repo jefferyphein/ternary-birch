@@ -10,8 +10,11 @@ from scipy.sparse import csr_matrix
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.map cimport map as cppmap
+from libcpp.memory cimport shared_ptr, make_shared
 from libc.stdint cimport uint64_t
 from libc.stdint cimport int64_t as Z64
+from libc.stdint cimport uint16_t as W16
+from libc.stdint cimport uint32_t as W32
 
 from operator import itemgetter
 from random import randint
@@ -23,8 +26,9 @@ from sage.rings.integer cimport Integer
 from sage.libs.gmp.types cimport mpz_t
 
 from sage.all import QuadraticForm
-from sage.all import Integers
+from sage.all import Integers, Rationals
 from sage.all import random_prime
+from sage.all import matrix
 
 from math import log, exp, lgamma
 
@@ -66,13 +70,37 @@ cdef extern from "Genus.h":
         @staticmethod
         Genus[T] convert[T](const Genus[R]& src)
 
+cdef extern from "Isometry.h":
+    cdef cppclass Isometry[R]:
+        R a11
+        R a12
+        R a13
+        R a21
+        R a22
+        R a23
+        R a31
+        R a32
+        R a33
+        pass
+
+cdef extern from "IsometrySequence.h":
+    cdef cppclass IsometrySequenceData[T]:
+        Isometry[T] isometry
+        T denominator
+        size_t src
+        size_t dst
+    cdef cppclass IsometrySequence[R,S,T]:
+        IsometrySequence(shared_ptr[Genus[T]], const T& p)
+        int done() const
+        IsometrySequenceData next()
+
 ctypedef mpz_class Z
 ctypedef PrimeSymbol[Z] Z_PrimeSymbol
 ctypedef QuadForm[Z] Z_QuadForm
 
 cdef class BirchGenus:
-    cdef Genus[Z] Z_genus
-    cdef Genus[Z64] Z64_genus
+    cdef shared_ptr[Genus[Z]] Z_genus
+    cdef shared_ptr[Genus[Z64]] Z64_genus
     cpdef Z64_genus_is_set
     cpdef N
     cpdef ramified_primes
@@ -134,16 +162,17 @@ cdef class BirchGenus:
             raise Exception(e.message)
 
         seed = seed if seed else 0
+        cdef uint64_t arg_seed = seed
 
         logging.info("Computing genus representatives...")
         genus_start = datetime.now()
-        self.Z_genus = Genus[Z](q, primes, seed)
+        self.Z_genus = make_shared[Genus[Z]](q, primes, arg_seed)
         genus_stop = datetime.now()
         logging.info("Finished computing genus representatives (time: {})".format(genus_stop-genus_start))
-        self.seed_ = self.Z_genus.seed()
+        self.seed_ = deref(self.Z_genus).seed()
         logging.info("Seed = {} ({})".format(self.seed_, "provided by user" if seed else "set randomly"))
 
-        cdef cppmap[Z,size_t] mymap = self.Z_genus.dimension_map()
+        cdef cppmap[Z,size_t] mymap = deref(self.Z_genus).dimension_map()
         cdef cppmap[Z,size_t].iterator it = mymap.begin()
         self.dims = dict()
         while it != mymap.end():
@@ -159,6 +188,77 @@ cdef class BirchGenus:
 
     def seed(self):
         return self.seed_
+
+    def isometry_sequence(self, p, precise=True):
+        prime = Integer(p)
+
+        if not prime.is_prime():
+            raise Exception("p is not prime.")
+
+        if self.N % p == 0:
+            raise Exception("Cannot compute Hecke matrix at primes dividing the discriminant.")
+
+        if not precise:
+            if not self.Z64_genus_is_set:
+                logging.info("Converting arbitrary precision Genus object to fixed-precision Genus object...")
+                self.Z64_genus = make_shared[Genus[Z64]](deref(self.Z_genus))
+                self.Z64_genus_is_set = True
+
+            return self._isometry_sequence_imprecise(prime)
+        else:
+            return self._isometry_sequence_precise(prime)
+
+    def _isometry_sequence_imprecise(self, Integer p):
+        cdef shared_ptr[IsometrySequence[W16,W32,Z64]] sequence
+        cdef Z64 prime = p
+        sequence = make_shared[IsometrySequence[W16,W32,Z64]](self.Z64_genus, prime)
+
+        cdef IsometrySequenceData[Z64] data
+        while not deref(sequence).done():
+            data = deref(sequence).next()
+
+            a11 = Integer(data.isometry.a11)
+            a12 = Integer(data.isometry.a12)
+            a13 = Integer(data.isometry.a13)
+            a21 = Integer(data.isometry.a21)
+            a22 = Integer(data.isometry.a22)
+            a23 = Integer(data.isometry.a23)
+            a31 = Integer(data.isometry.a31)
+            a32 = Integer(data.isometry.a32)
+            a33 = Integer(data.isometry.a33)
+            s = matrix(Integers(), 3, [ a11, a12, a13, a21, a22, a23, a31, a32, a33 ])
+
+            retval = dict()
+            retval['isometry'] = s
+            retval['denominator'] = Integer(data.denominator)
+            retval['src'] = Integer(data.src)
+            retval['dst'] = Integer(data.dst)
+            yield retval
+
+    def _isometry_sequence_precise(self, Integer p):
+        cdef shared_ptr[IsometrySequence[W16,W32,Z]] sequence
+        sequence = make_shared[IsometrySequence[W16,W32,Z]](self.Z_genus, Z(p.value))
+
+        cdef IsometrySequenceData[Z] data
+        while not deref(sequence).done():
+            data = deref(sequence).next()
+            a11 = _Z_to_int(data.isometry.a11)
+            a12 = _Z_to_int(data.isometry.a12)
+            a13 = _Z_to_int(data.isometry.a13)
+            a21 = _Z_to_int(data.isometry.a21)
+            a22 = _Z_to_int(data.isometry.a22)
+            a23 = _Z_to_int(data.isometry.a23)
+            a31 = _Z_to_int(data.isometry.a31)
+            a32 = _Z_to_int(data.isometry.a32)
+            a33 = _Z_to_int(data.isometry.a33)
+            s = matrix(Integers(), 3, [ a11, a12, a13, a21, a22, a23, a31, a32, a33 ])
+
+            retval = dict()
+            retval['isometry'] = s
+            retval['denominator'] = _Z_to_int(data.denominator)
+            retval['src'] = Integer(data.src)
+            retval['dst'] = Integer(data.dst)
+            yield retval
 
     def hecke_matrix(self, p, conductor, sparse=None, precise=True):
         prime = Integer(p)
@@ -187,7 +287,7 @@ cdef class BirchGenus:
         if not precise:
             if not self.Z64_genus_is_set:
                 logging.info("Converting arbitrary precision Genus object to fixed-precision Genus object...")
-                self.Z64_genus = Genus[Z].convert[Z64](self.Z_genus)
+                self.Z64_genus = make_shared[Genus[Z64]](deref(self.Z_genus))
                 self.Z64_genus_is_set = True
 
             start_time = datetime.now()
@@ -219,7 +319,7 @@ cdef class BirchGenus:
 
         try:
             start_time = datetime.now()
-            mymap = self.Z_genus.hecke_matrix_dense(Z(p.value))
+            mymap = deref(self.Z_genus).hecke_matrix_dense(Z(p.value))
             end_time = datetime.now()
             logging.info("  call time: {}".format(end_time-start_time))
             self.hecke[p] = dict()
@@ -242,7 +342,7 @@ cdef class BirchGenus:
 
         try:
             start_time = datetime.now()
-            mymap = self.Z64_genus.hecke_matrix_dense(p)
+            mymap = deref(self.Z64_genus).hecke_matrix_dense(p)
             end_time = datetime.now()
             logging.info("  call time: {}".format(end_time-start_time))
             self.hecke[p] = dict()
@@ -265,7 +365,7 @@ cdef class BirchGenus:
 
         try:
             start_time = datetime.now()
-            mymap = self.Z_genus.hecke_matrix_sparse(Z(p.value))
+            mymap = deref(self.Z_genus).hecke_matrix_sparse(Z(p.value))
             end_time = datetime.now()
             logging.info("  call time: {}".format(end_time-start_time))
             self.hecke[p] = dict()
@@ -305,7 +405,7 @@ cdef class BirchGenus:
 
         try:
             start_time = datetime.now()
-            mymap = self.Z64_genus.hecke_matrix_sparse(p)
+            mymap = deref(self.Z64_genus).hecke_matrix_sparse(p)
             end_time = datetime.now()
             logging.info("  call time: {}".format(end_time-start_time))
             self.hecke[p] = dict()
@@ -370,6 +470,7 @@ Seed = {}'''.format(self.N, self.facs, self.ramified_primes, self.dims, self.see
 
 cdef _Z_to_int(const Z& x):
     return Integer(x.get_str(), 10)
+
 
 cdef class _MatrixWrapper:
     cdef vector[int] vec
@@ -442,3 +543,6 @@ cdef _make_matrix(dim, vector[int]& data):
     mw = _MatrixWrapper(dim)
     mw.set_data(data)
     return np.asarray(mw)
+
+cdef do_something(const IsometrySequenceData[Z]& data):
+    print data.src, data.dst

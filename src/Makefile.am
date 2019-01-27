@@ -16,6 +16,7 @@ SOURCES += Genus.h
 SOURCES += HashMap.h
 SOURCES += Isometry.cpp
 SOURCES += Isometry.h
+SOURCES += IsometrySequence.h
 SOURCES += Math.cpp
 SOURCES += Math.h
 SOURCES += NeighborManager.h

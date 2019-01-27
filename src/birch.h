@@ -70,6 +70,9 @@ class Spinor;
 template<typename R>
 class GenusRep;
 
+template<typename R, typename S, typename T>
+class IsometrySequence;
+
 /* Struct definitions */
 
 template<typename R>

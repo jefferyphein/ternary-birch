@@ -348,8 +348,8 @@ AM_CXXFLAGS = -g -O3 -Wall -Werror -pedantic -pedantic-errors \
 	-fomit-frame-pointer -funroll-all-loops
 AM_LDFLAGS = -lm -lgmp -lgmpxx
 SOURCES = birch.h birch_util.cpp birch_util.h Fp.cpp Fp.h Genus.h \
-	HashMap.h Isometry.cpp Isometry.h Math.cpp Math.h \
-	NeighborManager.h QuadForm.cpp QuadForm.h Spinor.h
+	HashMap.h Isometry.cpp Isometry.h IsometrySequence.h Math.cpp \
+	Math.h NeighborManager.h QuadForm.cpp QuadForm.h Spinor.h
 birch_SOURCES = birch.cpp $(SOURCES)
 birch_CXXFLAGS = $(AM_CXXFLAGS)
 libbirch_la_SOURCES = $(SOURCES)

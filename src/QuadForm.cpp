@@ -69,47 +69,6 @@ Z Z_QuadForm::evaluate(const Z& x, const Z& y, const Z& z) const
 template<>
 Z_QuadForm Z_QuadForm::reduce(const Z_QuadForm& q, Z_Isometry& s)
 {
-//    if (mpz_sizeinbase(q.a_.get_mpz_t(), 2) < 40 &&
-//        mpz_sizeinbase(q.b_.get_mpz_t(), 2) < 40 &&
-//        mpz_sizeinbase(q.c_.get_mpz_t(), 2) < 40 &&
-//        mpz_sizeinbase(q.f_.get_mpz_t(), 2) < 40 &&
-//        mpz_sizeinbase(q.g_.get_mpz_t(), 2) < 40 &&
-//        mpz_sizeinbase(q.h_.get_mpz_t(), 2) < 40)
-//    {
-//        Z a = q.a_;
-//        Z b = q.b_;
-//        Z c = q.c_;
-//        Z f = q.f_;
-//        Z g = q.g_;
-//        Z h = q.h_;
-//
-//        Z64_QuadForm q64(mpz_get_si(a.get_mpz_t()),
-//                         mpz_get_si(b.get_mpz_t()),
-//                         mpz_get_si(c.get_mpz_t()),
-//                         mpz_get_si(f.get_mpz_t()),
-//                         mpz_get_si(g.get_mpz_t()),
-//                         mpz_get_si(h.get_mpz_t()));
-//        Z64_Isometry s64(mpz_get_si(s.a11.get_mpz_t()),
-//                         mpz_get_si(s.a12.get_mpz_t()),
-//                         mpz_get_si(s.a13.get_mpz_t()),
-//                         mpz_get_si(s.a21.get_mpz_t()),
-//                         mpz_get_si(s.a22.get_mpz_t()),
-//                         mpz_get_si(s.a23.get_mpz_t()),
-//                         mpz_get_si(s.a31.get_mpz_t()),
-//                         mpz_get_si(s.a32.get_mpz_t()),
-//                         mpz_get_si(s.a33.get_mpz_t()));
-//        q64 = Z64_QuadForm::reduce(q64, s64);
-//
-//        Z_Isometry ss(s64.a11, s64.a12, s64.a13,
-//                      s64.a21, s64.a22, s64.a23,
-//                      s64.a31, s64.a32, s64.a33);
-//        //Z_QuadForm qq(Z(q64.a()), Z(q64.b()), Z(q64.c()), Z(q64.f()), Z(q64.g()), Z(q64.h()));
-//        s.a11 = ss.a11; s.a12 = ss.a12; s.a13 = ss.a13;
-//        s.a21 = ss.a21; s.a22 = ss.a22; s.a23 = ss.a23;
-//        s.a31 = ss.a31; s.a32 = ss.a32; s.a33 = ss.a33;
-//        //return qq;
-//    }
-
     mpz_t a, b, c, f, g, h;
     mpz_init_set(a, q.a_.get_mpz_t());
     mpz_init_set(b, q.b_.get_mpz_t());
@@ -613,8 +572,8 @@ Z_QuadForm Z_QuadForm::get_quad_form(const std::vector<Z_PrimeSymbol>& input)
 
                 // We assume that the quadratic space is good outside of the
                 // initial specifications. If we detect that one of our
-                // auxilliary is ramified, we immediately flag this space as
-                // not good and try another solution.
+                // auxilliary primes is ramified, we immediately flag this
+                // space as not good and try another solution.
                 int good = true;
                 for (size_t n=primes.size()+1; n<fullbase.size(); n++)
                 {
@@ -648,7 +607,8 @@ Z_QuadForm Z_QuadForm::get_quad_form(const std::vector<Z_PrimeSymbol>& input)
         // If we've added a prime to the end of our factor base list, we
         // remove it if it didn't lead to a solution. This helps avoid the
         // factor base growing too large, although it can lead to the size of
-        // the primes in the factor base becoming larger than we'd like.
+        // the primes in the factor base becoming larger than we'd like. (This
+        // does not appear to be a problem in practice.)
         if (added_to_end)
         {
             signs.pop_back();
