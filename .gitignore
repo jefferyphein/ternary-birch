@@ -17,9 +17,12 @@ temp
 # Autotools stuff
 COPYING
 INSTALL
+aclocal.m4
 ar-lib
 compile
 Makefile
+Makefile.in
+configure
 config.guess
 config.sub
 depcomp
