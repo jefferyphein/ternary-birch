@@ -395,7 +395,7 @@ cdef class BirchGenus:
 
         if sparse is None:
             density = self._estimated_density(p, conductor)
-            logging.info("Hecke matrix density estimate at p=%s: %s%", prime, density * 100.0)
+            logging.info("Hecke matrix density estimate at p=%s: %s%%", prime, density * 100.0)
             sparse = density <= 0.3
             logging.info("Based on density estimates, computing %s matrices", "sparse" if sparse else "dense")
 
