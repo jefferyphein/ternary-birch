@@ -2,9 +2,13 @@
 # distutils: sources = birch_util.cpp Fp.cpp Isometry.cpp Math.cpp QuadForm.cpp
 # distutils: extra_compile_args = -g -Wall -Werror -pedantic -std=c++11 -fvar-tracking-assignments-toggle
 
+from __future__ import print_function
+
 import logging
-from datetime import datetime
 import numpy as np
+
+from queue import Queue
+from datetime import datetime
 from scipy.sparse import csr_matrix
 
 from libcpp.string cimport string
@@ -15,6 +19,7 @@ from libc.stdint cimport uint64_t
 from libc.stdint cimport int64_t as Z64
 from libc.stdint cimport uint16_t as W16
 from libc.stdint cimport uint32_t as W32
+from libc.math cimport sqrt, floor
 
 from operator import itemgetter
 from random import randint
@@ -29,6 +34,7 @@ from sage.all import QuadraticForm
 from sage.all import Integers, Rationals
 from sage.all import random_prime
 from sage.all import matrix
+from sage.all import next_prime
 
 from math import log, exp, lgamma
 
@@ -108,6 +114,8 @@ cdef class BirchGenus:
     cpdef dims
     cpdef seed_
     cpdef hecke
+    cpdef sage_hecke
+    cpdef eigenvectors
 
     def __init__(self, N, ramified_primes=None, seed=None):
         self.N = Integer(N)
@@ -132,7 +140,7 @@ cdef class BirchGenus:
             prime.power = int(es[n])
             prime.ramified = p in self.ramified_primes
             primes.push_back(prime)
-            logging.info("{} at {}".format("Ramified" if prime.ramified else "Unramified", p))
+            logging.info("%s at %s", "Ramified" if prime.ramified else "Unramified", p)
 
         cdef Z_QuadForm q
         try:
@@ -168,9 +176,9 @@ cdef class BirchGenus:
         genus_start = datetime.now()
         self.Z_genus = make_shared[Genus[Z]](q, primes, arg_seed)
         genus_stop = datetime.now()
-        logging.info("Finished computing genus representatives (time: {})".format(genus_stop-genus_start))
+        logging.info("Finished computing genus representatives (time: %s)", genus_stop-genus_start)
         self.seed_ = deref(self.Z_genus).seed()
-        logging.info("Seed = {} ({})".format(self.seed_, "provided by user" if seed else "set randomly"))
+        logging.info("Seed = %s (%s)", self.seed_, "provided by user" if seed else "set randomly")
 
         cdef cppmap[Z,size_t] mymap = deref(self.Z_genus).dimension_map()
         cdef cppmap[Z,size_t].iterator it = mymap.begin()
@@ -182,12 +190,119 @@ cdef class BirchGenus:
         self.Z64_genus_is_set = False
 
         self.hecke = dict()
+        self.sage_hecke = dict()
+        self.eigenvectors = None
 
     def dimensions(self):
         return self.dims
 
     def seed(self):
         return self.seed_
+
+    def next_good_prime(self, p):
+        while True:
+            p = next_prime(p)
+            if self.N % p != 0:
+                break
+        return p
+
+    def rational_eigenvectors(self, precise=True, sparse=None, force=False):
+        # Do not duplicate work if we've already computed the eigenvectors
+        if not force and self.eigenvectors is not None:
+            return self.eigenvectors
+
+        self.eigenvectors = []
+
+        # Find the smallest good prime.
+        p = self.next_good_prime(1)
+
+        # The Hasse bound for our starting prime.
+        hasse = int(floor(2*sqrt(1.0*p)))
+
+        # Produce some initial jobs to get the ball rolling.
+        job_queue = Queue()
+        for conductor in self.dims:
+            A = self.sage_hecke_matrix(p, conductor, precise=precise, sparse=sparse)
+            for e in range(-hasse, hasse+1):
+                job = dict()
+                job['p'] = p
+                job['e'] = e
+                job['aps'] = dict()
+                job['matrix'] = A
+                job['conductor'] = conductor
+                job['subspace'] = None
+                job_queue.put(job)
+
+        # Process kernels as long as there are jobs in the queue.
+        while job_queue.qsize() > 0:
+            job = job_queue.get()
+
+            # Unpack the job.
+            p = job['p']
+            e = job['e']
+            matrix = job['matrix']
+            conductor = job['conductor']
+            subspace = job['subspace']
+
+            logging.info("Computing kernel of %s-matrix (p=%s, conductor=%s, eigenvalue=%s)...", matrix.dimensions(), p, conductor, e)
+
+            # Find the rational eigenspace with the specified value.
+            start_time = datetime.now()
+            if subspace is None:
+                kernel = (matrix - e).right_kernel()
+            else:
+                kernel = (matrix - e*subspace.transpose()).right_kernel()
+            end_time = datetime.now()
+
+            dim = kernel.dimension()
+
+            # Nothing to do if there is no eigenspace.
+            if dim == 0:
+                logging.info("  trivial kernel found (time: %s)", end_time-start_time)
+                continue
+
+            # Assign the eigenvalue to a new dictionary.
+            aps = dict(job['aps'])
+            aps[p] = e
+
+            # Get the kernel as a matrix object and return it to the original
+            # coordinates.
+            S = kernel.matrix()
+            if subspace is not None:
+                S = S * subspace
+
+            if dim == 1:
+                logging.info("  eigenvector found (time: %s)", end_time-start_time)
+
+                x = dict()
+                x['vector'] = S[0]
+                x['aps'] = aps
+                x['conductor'] = conductor
+                self.eigenvectors.append(x)
+                continue
+
+            logging.info("  %s-dimensional eigenspace found (time: %s)", S.dimensions()[0], end_time-start_time)
+
+            # If we found a multi-dimensional eigenspace, we need to break it
+            # apart using the Hecke matrix at the next good prime.
+            p = self.next_good_prime(p)
+
+            # Project the Hecke matrix onto the desired eigenspace.
+            A = self.sage_hecke_matrix(p, conductor, precise=precise, sparse=sparse)
+            A = A * S.transpose()
+
+            hasse = int(floor(2*sqrt(1.0*p)))
+            for e in range(-hasse, hasse+1):
+                newjob = dict()
+                newjob['p'] = p
+                newjob['e'] = e
+                newjob['aps'] = aps
+                newjob['matrix'] = A
+                newjob['conductor'] = conductor
+                newjob['subspace'] = S
+                job_queue.put(newjob)
+
+        return self.eigenvectors
 
     def isometry_sequence(self, p, precise=True):
         prime = Integer(p)
@@ -280,9 +395,9 @@ cdef class BirchGenus:
 
         if sparse is None:
             density = self._estimated_density(p, conductor)
-            logging.info("Hecke matrix density estimate at p={}: {}%".format(prime, density * 100.0))
+            logging.info("Hecke matrix density estimate at p=%s: %s%", prime, density * 100.0)
             sparse = density <= 0.3
-            logging.info("Based on density estimates, computing {} matrices".format("sparse" if sparse else "dense"))
+            logging.info("Based on density estimates, computing %s matrices", "sparse" if sparse else "dense")
 
         if not precise:
             if not self.Z64_genus_is_set:
@@ -292,26 +407,56 @@ cdef class BirchGenus:
 
             start_time = datetime.now()
             if sparse:
-                logging.info("Computing Hecke matrices (p={}, sparse, int64_t)...".format(prime))
+                logging.info("Computing Hecke matrices (p=%s, sparse, int64_t)...", prime)
                 self._hecke_matrix_sparse_imprecise(prime)
             else:
-                logging.info("Computing Hecke matrices (p={}, dense, int64_t)...".format(prime))
+                logging.info("Computing Hecke matrices (p=%s, dense, int64_t)...", prime)
                 self._hecke_matrix_dense_imprecise(prime)
         else:
             start_time = datetime.now()
             if sparse:
-                logging.info("Computing Hecke matrices (p={}, sparse, arbitrary)...".format(prime))
+                logging.info("Computing Hecke matrices (p=%s, sparse, arbitrary)...", prime)
                 self._hecke_matrix_sparse_precise(prime)
             else:
-                logging.info("Computing Hecke matrices (p={}, dense, arbitrary)...".format(prime))
+                logging.info("Computing Hecke matrices (p=%s, dense, arbitrary)...", prime)
                 self._hecke_matrix_dense_precise(prime)
         end_time = datetime.now()
-        logging.info("Finished computing Hecke matrices at p={} (time: {})".format(prime, end_time-start_time))
+        logging.info("Finished computing Hecke matrices at p=%s (time: %s)", prime, end_time-start_time)
 
         if conductor in self.hecke[prime]:
             return self.hecke[prime][conductor]
         else:
             raise Exception("No Hecke matrix associated to this conductor. How did this happen?")
+
+    def sage_hecke_matrix(self, p, conductor, precise=True, sparse=None):
+        prime = Integer(p)
+
+        if prime in self.sage_hecke:
+            if conductor in self.sage_hecke[prime]:
+                return self.sage_hecke[prime][conductor]
+
+        # Get the desired Hecke matrix and convert it into a sage matrix object.
+        A = self.hecke_matrix(p, conductor, precise=precise, sparse=sparse)
+
+        logging.info("Converting numpy matrix to sage matrix (p=%s, conductor=%s)...", p, conductor)
+
+        # TODO: Figure out a better way to do this. Currently this relies on
+        # fact that the matrix constructor in Sage does not accept
+        # scipy.csr_matrix objects.
+        start_time = datetime.now()
+        try:
+            B = matrix(A, sparse=False)
+        except Exception:
+            B = matrix(A.toarray(), sparse=True)
+        end_time = datetime.now()
+
+        logging.info("  conversion time: %s", end_time-start_time)
+
+        if not prime in self.sage_hecke:
+            self.sage_hecke[prime] = dict()
+
+        self.sage_hecke[prime][conductor] = B
+        return self.sage_hecke[prime][conductor]
 
     def _hecke_matrix_dense_precise(self, Integer p):
         cdef cppmap[Z,vector[int]] mymap
@@ -321,7 +466,7 @@ cdef class BirchGenus:
             start_time = datetime.now()
             mymap = deref(self.Z_genus).hecke_matrix_dense(Z(p.value))
             end_time = datetime.now()
-            logging.info("  call time: {}".format(end_time-start_time))
+            logging.info("  call time: %s", end_time-start_time)
             self.hecke[p] = dict()
         except Exception as e:
             raise Exception(e.message)
@@ -334,7 +479,7 @@ cdef class BirchGenus:
             incr(it)
 
         end_time = datetime.now()
-        logging.info("  copy time: {}".format(end_time-start_time))
+        logging.info("  copy time: %s", end_time-start_time)
 
     def _hecke_matrix_dense_imprecise(self, Integer p):
         cdef cppmap[Z64,vector[int]] mymap
@@ -344,7 +489,7 @@ cdef class BirchGenus:
             start_time = datetime.now()
             mymap = deref(self.Z64_genus).hecke_matrix_dense(p)
             end_time = datetime.now()
-            logging.info("  call time: {}".format(end_time-start_time))
+            logging.info("  call time: %s", end_time-start_time)
             self.hecke[p] = dict()
         except Exception as e:
             raise Exception(e.message)
@@ -357,7 +502,7 @@ cdef class BirchGenus:
             incr(it)
 
         end_time = datetime.now()
-        logging.info("  copy time: {}".format(end_time-start_time))
+        logging.info("  copy time: %s", end_time-start_time)
 
     def _hecke_matrix_sparse_precise(self, Integer p):
         cdef cppmap[Z,vector[vector[int]]] mymap
@@ -367,7 +512,7 @@ cdef class BirchGenus:
             start_time = datetime.now()
             mymap = deref(self.Z_genus).hecke_matrix_sparse(Z(p.value))
             end_time = datetime.now()
-            logging.info("  call time: {}".format(end_time-start_time))
+            logging.info("  call time: %s", end_time-start_time)
             self.hecke[p] = dict()
         except Exception as e:
             raise Exception(e.message)
@@ -397,7 +542,7 @@ cdef class BirchGenus:
             incr(it)
 
         end_time = datetime.now()
-        logging.info("  copy time: {}".format(end_time-start_time))
+        logging.info("  copy time: %s", end_time-start_time)
 
     def _hecke_matrix_sparse_imprecise(self, Integer p):
         cdef cppmap[Z64,vector[vector[int]]] mymap
@@ -407,7 +552,7 @@ cdef class BirchGenus:
             start_time = datetime.now()
             mymap = deref(self.Z64_genus).hecke_matrix_sparse(p)
             end_time = datetime.now()
-            logging.info("  call time: {}".format(end_time-start_time))
+            logging.info("  call time: %s", end_time-start_time)
             self.hecke[p] = dict()
         except Exception as e:
             raise Exception(e.message)
@@ -437,7 +582,7 @@ cdef class BirchGenus:
             incr(it)
 
         end_time = datetime.now()
-        logging.info("  copy time: {}".format(end_time-start_time))
+        logging.info("  copy time: %s", end_time-start_time)
 
     def _estimated_density(self, p, conductor):
         if p == 2: p=p+1
@@ -552,4 +697,4 @@ cdef _make_matrix(dim, vector[int]& data):
     return np.asarray(mw)
 
 cdef do_something(const IsometrySequenceData[Z]& data):
-    print data.src, data.dst
+    print(data.src, data.dst)
