@@ -440,9 +440,16 @@ cdef class BirchGenus:
         logging.info("  copy time: {}".format(end_time-start_time))
 
     def _estimated_density(self, p, conductor):
-        if p == 2: p+1
+        if p == 2: p=p+1
         M = (p+1) / 2
         N = self.dims[conductor]
+
+        if N == 0:
+            return 0.0
+
+        if N == 1:
+            return 1.0
+
         if conductor == 1:
             return 1.0 - exp(2 * M * (log(N-1) - log(N)))
 
