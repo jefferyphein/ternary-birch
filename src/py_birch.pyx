@@ -108,7 +108,7 @@ cdef class BirchGenus:
     cdef shared_ptr[Genus[Z]] Z_genus
     cdef shared_ptr[Genus[Z64]] Z64_genus
     cpdef Z64_genus_is_set
-    cpdef N
+    cpdef level
     cpdef ramified_primes
     cpdef facs
     cpdef dims
@@ -117,9 +117,9 @@ cdef class BirchGenus:
     cpdef sage_hecke
     cpdef eigenvectors
 
-    def __init__(self, N, ramified_primes=None, seed=None):
-        self.N = Integer(N)
-        self.facs = self.N.factor()
+    def __init__(self, level, ramified_primes=None, seed=None):
+        self.level = Integer(level)
+        self.facs = self.level.factor()
         ps = map(itemgetter(0), self.facs)
         es = map(itemgetter(1), self.facs)
 
@@ -202,7 +202,7 @@ cdef class BirchGenus:
     def next_good_prime(self, p):
         while True:
             p = next_prime(p)
-            if self.N % p != 0:
+            if self.level % p != 0:
                 break
         return p
 
@@ -310,8 +310,8 @@ cdef class BirchGenus:
         if not prime.is_prime():
             raise Exception("p is not prime.")
 
-        if self.N % p == 0:
-            raise Exception("Cannot compute Hecke matrix at primes dividing the discriminant.")
+        if self.level % p == 0:
+            raise Exception("Cannot compute Hecke matrix at primes dividing the level.")
 
         if not precise:
             if not self.Z64_genus_is_set:
@@ -381,11 +381,11 @@ cdef class BirchGenus:
         if not prime.is_prime():
             raise Exception("p is not prime.")
 
-        if self.N % conductor != 0:
-            raise Exception("Conductor must divide the discriminant.")
+        if self.level % conductor != 0:
+            raise Exception("Conductor must divide the level.")
 
-        if self.N % p == 0:
-            raise Exception("Cannot compute Hecke matrix at primes dividing the discriminant.")
+        if self.level % p == 0:
+            raise Exception("Cannot compute Hecke matrix at primes dividing the level.")
 
         if prime in self.hecke:
             if conductor in self.hecke[prime]:
@@ -615,14 +615,32 @@ cdef class BirchGenus:
         return 1.0 - density
 
     def __repr__(self):
-        return '''Birch genus with discriminant {} = {}
+        return '''Birch genus with level {} = {}
 Ramified primes = {}
 Dimensions = {}
-Seed = {}'''.format(self.N, self.facs, self.ramified_primes, self.dims, self.seed_)
+Seed = {}'''.format(self.level, self.facs, self.ramified_primes, self.dims, self.seed_)
+
+    def __reduce__(self):
+        return (BirchGenus,
+            (self.level, self.ramified_primes, self.seed_),
+            self.__getstate__())
+
+    def __getstate__(self):
+        state = dict()
+        if self.eigenvectors is not None:
+            state['eigenvectors'] = list(self.eigenvectors)
+        else:
+            state['eigenvectors'] = None
+        return state
+
+    def __setstate__(self, state):
+        if state['eigenvectors'] is not None:
+            self.eigenvectors = list(state['eigenvectors'])
+        else:
+            self.eigenvectors = None
 
 cdef _Z_to_int(const Z& x):
     return Integer(x.get_str(), 10)
-
 
 cdef class _MatrixWrapper:
     cdef vector[int] vec
