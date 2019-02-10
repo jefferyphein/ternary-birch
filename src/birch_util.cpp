@@ -43,6 +43,30 @@ namespace birch_util
     }
 
     template<>
+    W32 convert_Integer<Z>(const Z& x)
+    {
+        return (W32)mpz_get_ui(x.get_mpz_t());
+    }
+    
+    template<>
+    W32 convert_Integer<Z64>(const Z64& x)
+    {
+        return (W32)x;
+    }
+
+    template<>
+    W64 convert_Integer<Z>(const Z& x)
+    {
+        return (W64)mpz_get_ui(x.get_mpz_t());
+    }
+    
+    template<>
+    W64 convert_Integer<Z64>(const Z64& x)
+    {
+        return (W64)x;
+    }
+
+    template<>
     Z convert_Integer<Z64>(const Z64& x)
     {
         return Z(x);
@@ -52,6 +76,18 @@ namespace birch_util
     Z64 convert_Integer<Z>(const Z& x)
     {
         return mpz_get_si(x.get_mpz_t());
+    }
+
+    template<>
+    Z64 convert_Integer<Z64>(const Z64& x)
+    {
+        return x;
+    }
+
+    template<>
+    Z convert_Integer<Z>(const Z& x)
+    {
+        return x;
     }
 
     int char_vals[256] = {

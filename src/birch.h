@@ -55,6 +55,12 @@ class Fp;
 template<typename R, typename S>
 class F2;
 
+template<typename R>
+class Eigenvector;
+
+template<typename R>
+class EigenvectorContainer;
+
 template<typename R, typename S, typename T>
 class NeighborManager;
 
@@ -72,6 +78,8 @@ class GenusRep;
 
 template<typename R, typename S, typename T>
 class IsometrySequence;
+
+class SetCover;
 
 /* Struct definitions */
 

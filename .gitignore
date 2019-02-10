@@ -13,6 +13,7 @@ autom4te.cache
 libtool
 src/.deps
 temp
+birch
 
 # Autotools stuff
 COPYING

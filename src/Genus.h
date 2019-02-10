@@ -7,6 +7,7 @@
 #include "Spinor.h"
 #include "Isometry.h"
 #include "NeighborManager.h"
+#include "Eigenvector.h"
 
 template<typename R>
 class GenusRep
@@ -55,7 +56,7 @@ public:
 
         if (symbols.size() > 63)
         {
-            throw std::invalid_argument("Must have 63 or fewer prime divisors.");
+            throw std::domain_error("Must have 63 or fewer prime divisors.");
         }
 
         size_t num_conductors = 1LL << symbols.size();
@@ -346,6 +347,79 @@ public:
         return this->hecke_matrix_sparse_internal(p);
     }
 
+    Eigenvector<R> eigenvector(const std::vector<Z32>& vec, const R& conductor) const
+    {
+        size_t num_conductors = this->conductors.size();
+        bool found = false;
+
+        size_t k;
+        for (k=0; k<num_conductors; k++)
+        {
+            if (this->conductors[k] == conductor)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            throw std::invalid_argument("Invalid conductor.");
+        }
+
+        size_t dim = this->dims[k];
+        if (dim != vec.size())
+        {
+            throw std::invalid_argument("Eigenvector has incorrect dimension.");
+        }
+
+        size_t fulldim = this->size();
+
+        std::vector<Z32> temp(this->size());
+        const std::vector<int>& lut = this->lut_positions[k];
+
+        for (size_t n=0; n<fulldim; n++)
+        {
+            if (lut[n] != -1)
+            {
+                temp[n] = vec[lut[n]];
+            }
+        }
+
+        return Eigenvector<R>(std::move(temp), k);
+    }
+
+    std::vector<Z32> eigenvalues(EigenvectorManager<R>& vector_manager, const R& p) const
+    {
+        R bits16 = birch_util::convert_Integer<Z64,R>(1LL << 16);
+        R bits32 = birch_util::convert_Integer<Z64,R>(1LL << 32);
+
+        if (p == 2)
+        {
+            W16 prime = 2;
+            std::shared_ptr<W16_F2> GF = std::make_shared<W16_F2>(prime, this->seed());
+            return this->_eigenvectors<W16,W32>(vector_manager, GF, p);
+        }
+        else if (p < bits16)
+        {
+            W16 prime = birch_util::convert_Integer<R,W16>(p);
+            std::shared_ptr<W16_Fp> GF = std::make_shared<W16_Fp>(prime, this->seed(), true);
+            return this->_eigenvectors<W16,W32>(vector_manager, GF, p);
+        }
+        else if (p < bits32)
+        {
+            W32 prime = birch_util::convert_Integer<R,W32>(p);
+            std::shared_ptr<W32_Fp> GF = std::make_shared<W32_Fp>(prime, this->seed(), false);
+            return this->_eigenvectors<W32,W64>(vector_manager, GF, p);
+        }
+        else
+        {
+            W64 prime = birch_util::convert_Integer<R,W64>(p);
+            std::shared_ptr<W64_Fp> GF = std::make_shared<W64_Fp>(prime, this->seed(), false);
+            return this->_eigenvectors<W64,W128>(vector_manager, GF, p);
+        }
+    }
+
     const GenusRep<R>& representative(size_t n) const
     {
         return this->hash->get(n);
@@ -368,6 +442,74 @@ private:
     std::unique_ptr<HashMap<GenusRep<R>>> hash;
     std::unique_ptr<Spinor<R>> spinor;
     W64 seed_;
+
+    template<typename S, typename T>
+    std::vector<Z32> _eigenvectors(EigenvectorManager<R>& vector_manager, std::shared_ptr<Fp<S,T>> GF, const R& p) const
+    {
+        std::vector<Z32> eigenvalues(vector_manager.size());
+
+        S prime = GF->prime();
+
+        const GenusRep<R>& mother = this->hash->get(0);
+
+        size_t num_indices = vector_manager.indices.size();
+        for (size_t index=0; index<num_indices; index++)
+        {
+            Z64 npos = vector_manager.indices[index];
+            const GenusRep<R>& cur = this->hash->get(npos);
+            NeighborManager<S,T,R> neighbor_manager(cur.q, GF);
+            for (W64 t=0; t<=prime; t++)
+            {
+                GenusRep<R> foo = neighbor_manager.get_reduced_neighbor_rep((S)t);
+
+                size_t rpos = this->hash->indexof(foo);
+                size_t offset = vector_manager.stride * rpos;
+                __builtin_prefetch(&vector_manager.strided_eigenvectors[offset], 0, 0);
+
+                W64 spin_vals;
+                if (rpos == npos)
+                {
+                    spin_vals = this->spinor->norm(foo.q, foo.s, p);
+                }
+                else
+                {
+                    const GenusRep<R>& rep = this->hash->get(rpos);
+                    foo.s = cur.s * foo.s;
+                    R scalar = p;
+
+                    foo.s = foo.s * rep.sinv;
+
+                    scalar *= birch_util::my_pow(cur.es);
+                    scalar *= birch_util::my_pow(rep.es);
+
+                    spin_vals = this->spinor->norm(mother.q, foo.s, scalar);
+                }
+
+                for (Z64 vpos : vector_manager.position_lut[index])
+                {
+                    W64 cond = vector_manager.conductors[vpos];
+                    Z32 value = birch_util::char_val(spin_vals & cond);
+                    Z32 coord = vector_manager.strided_eigenvectors[offset + vpos];
+                    if (coord)
+                    {
+                        eigenvalues[vpos] += (value * coord);
+                    }
+                }
+            }
+
+            // Divide out the coordinate associated to the eigenvector to
+            // recover the actual eigenvalue.
+            for (Z64 vpos : vector_manager.position_lut[index])
+            {
+                size_t offset = vector_manager.stride * npos;
+                Z32 coord = vector_manager.strided_eigenvectors[offset + vpos];
+                assert( eigenvalues[vpos] % coord == 0 );
+                eigenvalues[vpos] /= coord;
+            }
+        }
+
+        return eigenvalues;
+    }
 
     // TODO: Add the actual mass formula here for reference.
     Z get_mass(const QuadForm<R>& q, const std::vector<PrimeSymbol<R>>& symbols)

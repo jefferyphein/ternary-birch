@@ -49,7 +49,7 @@ public:
         // TODO: Come up with a better way to handle this case.
         if (this->done())
         {
-            throw std::invalid_argument("No more isometries.");
+            throw std::domain_error("No more isometries.");
         }
 
         // We assume that the current state is valid, and so we proceed by

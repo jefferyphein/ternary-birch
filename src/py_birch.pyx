@@ -1,6 +1,6 @@
 # distutils: language = c++
-# distutils: sources = birch_util.cpp Fp.cpp Isometry.cpp Math.cpp QuadForm.cpp
-# distutils: extra_compile_args = -g -Wall -Werror -pedantic -std=c++11 -fvar-tracking-assignments-toggle
+# distutils: sources = birch_util.cpp Fp.cpp Isometry.cpp Math.cpp QuadForm.cpp SetCover.cpp
+# distutils: extra_compile_args = -g -Wall -Werror -std=c++11 -fvar-tracking-assignments-toggle
 
 from __future__ import print_function
 
@@ -15,10 +15,11 @@ from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.map cimport map as cppmap
 from libcpp.memory cimport shared_ptr, make_shared
-from libc.stdint cimport uint64_t
+from libc.stdint cimport int32_t as Z32
 from libc.stdint cimport int64_t as Z64
 from libc.stdint cimport uint16_t as W16
 from libc.stdint cimport uint32_t as W32
+from libc.stdint cimport uint64_t as W64
 from libc.math cimport sqrt, floor
 
 from operator import itemgetter
@@ -44,7 +45,7 @@ cdef extern from "<utility>" namespace "std" nogil:
 cdef extern from "gmpxx.h":
     cdef cppclass mpz_class:
         mpz_class(mpz_t a)
-        string get_str(int base=10)
+        string get_str(int base)
 
 cdef extern from "QuadForm.h":
     cdef cppclass PrimeSymbol[R]:
@@ -64,14 +65,27 @@ cdef extern from "QuadForm.h":
         @staticmethod
         QuadForm[R] get_quad_form(const vector[PrimeSymbol[R]]& primes) except +
 
+cdef extern from "Eigenvector.h":
+    cdef cppclass Eigenvector[R]:
+        const vector[Z32]& data() const
+
+    cdef cppclass EigenvectorManager[R]:
+        void add_eigenvector(Eigenvector[R]&& vector)
+        size_t size() const
+        const Eigenvector[R]& operator[](size_t index) const
+        void finalize()
+
 cdef extern from "Genus.h":
     cdef cppclass Genus[R]:
         Genus()
-        Genus(const QuadForm[R]& q, const vector[PrimeSymbol[R]]& symbols, uint64_t seed)
+        Genus(const QuadForm[R]& q, const vector[PrimeSymbol[R]]& symbols, W64 seed)
         cppmap[R,size_t] dimension_map() const
-        uint64_t seed() const
+        W64 seed() const
         cppmap[R,vector[int]] hecke_matrix_dense(const R& p) except +
         cppmap[R,vector[vector[int]]] hecke_matrix_sparse(const R& p) except +
+
+        Eigenvector[R] eigenvector(const vector[Z32]& vec, const R& conductor) except +
+        vector[Z32] eigenvalues(EigenvectorManager[R]& manager, const R& p) except +
 
         @staticmethod
         Genus[T] convert[T](const Genus[R]& src)
@@ -107,6 +121,8 @@ ctypedef QuadForm[Z] Z_QuadForm
 cdef class BirchGenus:
     cdef shared_ptr[Genus[Z]] Z_genus
     cdef shared_ptr[Genus[Z64]] Z64_genus
+    cdef EigenvectorManager[Z] Z_manager
+    cdef EigenvectorManager[Z64] Z64_manager
     cpdef Z64_genus_is_set
     cpdef level
     cpdef ramified_primes
@@ -170,7 +186,7 @@ cdef class BirchGenus:
             raise Exception(e.message)
 
         seed = seed if seed else 0
-        cdef uint64_t arg_seed = seed
+        cdef W64 arg_seed = seed
 
         logging.info("Computing genus representatives...")
         genus_start = datetime.now()
@@ -302,7 +318,107 @@ cdef class BirchGenus:
                 newjob['subspace'] = S
                 job_queue.put(newjob)
 
+        # Set up the eigenvector manager so we can compute eigenvalues.
+        cdef vector[Z32] data
+        for entry in self.eigenvectors:
+            vec = entry['vector']
+            cond = entry['conductor']
+            dimension = len(vec)
+            data = vector[Z32](dimension)
+            for n,value in enumerate(vec):
+                data[n] = value
+            self.Z_manager.add_eigenvector(deref(self.Z_genus).eigenvector(data, Z(Integer(cond).value)))
+        self.Z_manager.finalize()
+
+        # TODO: Remove the Z64_manager calls and make it so that the
+        # Z64_manager can just copy the Z_manager.
+
         return self.eigenvectors
+
+    # TODO: Make it so that computing neighbors with 32-bit primes doesn't
+    # crash when using precise=False.
+
+    def compute_eigenvalues(self, p, precise=True):
+        prime = Integer(p)
+
+        if not prime.is_prime():
+            raise Exception("p is not prime.")
+
+        if self.level % prime == 0:
+            raise Exception("Cannot compute eigenvalues at primes dividing the level.")
+
+        # If we haven't already computed the eigenvectors, do so now.
+        if self.eigenvectors is None:
+            self.rational_eigenvectors()
+
+        # TODO: Make this better.
+        cdef vector[Z32] data
+        if not precise and not self.Z64_genus_is_set:
+            self.Z64_genus = make_shared[Genus[Z64]](deref(self.Z_genus))
+            self.Z64_genus_is_set = True
+
+            for entry in self.eigenvectors:
+                vec = entry['vector']
+                cond = entry['conductor']
+                dimension = len(vec)
+                data = vector[Z32](dimension)
+                for n,value in enumerate(vec):
+                    data[n] = value
+                self.Z64_manager.add_eigenvector(deref(self.Z64_genus).eigenvector(data, Integer(cond)))
+            self.Z64_manager.finalize()
+
+        # Compute the eigenvalues.
+        cdef vector[Z32] aps
+        if precise:
+            aps = deref(self.Z_genus).eigenvalues(self.Z_manager, Z(Integer(p).value))
+        else:
+            aps = deref(self.Z64_genus).eigenvalues(self.Z64_manager, Integer(p))
+
+        # Store eigenvalues in memory.
+        for n,vec in enumerate(self.eigenvectors):
+            vec['aps'][prime] = aps[n]
+
+        return [ aps[n] for n in range(aps.size()) ]
+
+    def compute_eigenvalues_upto(self, upper, precise=True):
+        ps = []
+        p = 1
+        while True:
+            p = self.next_good_prime(p)
+            if p <= upper:
+                ps.append(p)
+            else:
+                break
+
+        # If eigenvectors haven't already been computed, do so now.
+        if self.eigenvectors is None:
+            self.rational_eigenvectors()
+
+        # TODO: Make this better.
+        cdef vector[Z32] data
+        if not precise and not self.Z64_genus_is_set:
+            self.Z64_genus = make_shared[Genus[Z64]](deref(self.Z_genus))
+            self.Z64_genus_is_set = True
+
+            for entry in self.eigenvectors:
+                vec = entry['vector']
+                cond = entry['conductor']
+                dimension = len(vec)
+                data = vector[Z32](dimension)
+                for n,value in enumerate(vec):
+                    data[n] = value
+                self.Z64_manager.add_eigenvector(deref(self.Z64_genus).eigenvector(data, Integer(cond)))
+            self.Z64_manager.finalize()
+
+        cdef vector[Z32] aps
+        for p in ps:
+            if precise:
+                aps = deref(self.Z_genus).eigenvalues(self.Z_manager, Z(Integer(p).value))
+            else:
+                aps = deref(self.Z64_genus).eigenvalues(self.Z64_manager, Integer(p))
+
+            for n,vec in enumerate(self.eigenvectors):
+                vec['aps'][p] = aps[n]
 
     def isometry_sequence(self, p, precise=True):
         prime = Integer(p)
@@ -640,7 +756,7 @@ Seed = {}'''.format(self.level, self.facs, self.ramified_primes, self.dims, self
             self.eigenvectors = None
 
 cdef _Z_to_int(const Z& x):
-    return Integer(x.get_str(), 10)
+    return Integer(x.get_str(10), 10)
 
 cdef class _MatrixWrapper:
     cdef vector[int] vec

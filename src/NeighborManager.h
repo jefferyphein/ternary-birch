@@ -13,6 +13,7 @@ public:
     NeighborManager(const QuadForm<T>& q, std::shared_ptr<Fp<R,S>> GF)
     {
         this->q = q;
+        this->disc = q.discriminant();
 
         QuadFormFp<R,S> qp = q.mod(GF);
 
@@ -329,12 +330,25 @@ public:
         ff *= p;
         hh /= p;
 
-        return QuadForm<T>(aa, bb, cc, ff, gg, hh);
+        QuadForm<T> retval(aa, bb, cc, ff, gg, hh);
+        if (std::is_same<T,Z64>::value)
+        {
+            // If we're not using arbitrary precision, throw an exception if
+            // the discriminant of the p-neighbor isn't correct.
+            if (retval.discriminant() != this->disc)
+            {
+                throw std::overflow_error(
+                    "An overflow has occurred. The p-neighbor's discriminant "
+                    "does not match the original.");
+            }
+        }
+        return retval;
     }
 
 private:
     std::shared_ptr<Fp<R,S>> GF;
     QuadForm<T> q;
+    T disc;
     R a, b, c, f, g, h;
     Vector3<R> vec;
     R a0;
