@@ -300,17 +300,17 @@ public:
                 return Isometry<R>::automorphisms[2];
             }
         }
-    
+
         if (border(q, 2))
         {
             return Isometry<R>::automorphisms[3];
         }
-    
+
         if (border(q, 3))
         {
             return Isometry<R>::automorphisms[4];
         }
-    
+
         if (border(q, 4))
         {
             if (border(q, 10))
@@ -329,7 +329,7 @@ public:
                 return Isometry<R>::automorphisms[7];
             }
         }
-    
+
         if (border(q, 5))
         {
             if (border(q, 6))
@@ -358,7 +358,7 @@ public:
                 return Isometry<R>::automorphisms[11];
             }
         }
-    
+
         if (border(q, 6))
         {
             if (border(q, 12))
@@ -377,7 +377,7 @@ public:
                 return Isometry<R>::automorphisms[14];
             }
         }
-    
+
         if (border(q, 7))
         {
             if (border(q, 8) && border(q, 15))
@@ -407,7 +407,7 @@ public:
                 return Isometry<R>::automorphisms[19];
             }
         }
-    
+
         if (border(q, 8))
         {
             if (border(q, 9))
@@ -445,7 +445,7 @@ public:
                 return Isometry<R>::automorphisms[26];
             }
         }
-    
+
         if (border(q, 9))
         {
             if (border(q, 12))
@@ -479,7 +479,7 @@ public:
                 return Isometry<R>::automorphisms[32];
             }
         }
-    
+
         if (border(q, 10))
         {
             if (border(q, 11) && border(q, 12))
@@ -491,27 +491,27 @@ public:
                 return Isometry<R>::automorphisms[34];
             }
         }
-    
+
         if (border(q, 11))
         {
             return Isometry<R>::automorphisms[35];
         }
-    
+
         if (border(q, 12))
         {
             return Isometry<R>::automorphisms[36];
         }
-    
+
         if (border(q, 13) && border(q, 14))
         {
             return Isometry<R>::automorphisms[37];
         }
-    
+
         if (border(q, 14))
         {
             return Isometry<R>::automorphisms[38];
         }
-    
+
         if (border(q, 15))
         {
             if (border(q, 16))
@@ -523,7 +523,7 @@ public:
                 return Isometry<R>::automorphisms[40];
             }
         }
-    
+
         return Isometry<R>::automorphisms[41];
     }
 

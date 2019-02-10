@@ -35,7 +35,7 @@ namespace birch_util
     {
         return (W16)mpz_get_ui(x.get_mpz_t());
     }
-    
+
     template<>
     W16 convert_Integer<Z64>(const Z64& x)
     {
@@ -47,7 +47,7 @@ namespace birch_util
     {
         return (W32)mpz_get_ui(x.get_mpz_t());
     }
-    
+
     template<>
     W32 convert_Integer<Z64>(const Z64& x)
     {
@@ -59,7 +59,7 @@ namespace birch_util
     {
         return (W64)mpz_get_ui(x.get_mpz_t());
     }
-    
+
     template<>
     W64 convert_Integer<Z64>(const Z64& x)
     {

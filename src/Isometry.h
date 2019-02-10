@@ -92,21 +92,21 @@ public:
              from.f()*this->a21*this->a31 +
              from.g()*this->a11*this->a31 +
              from.h()*this->a11*this->a21) != to.a() * scalar) { return false; }
-    
+
         if ((from.a()*this->a12*this->a12 +
              from.b()*this->a22*this->a22 +
              from.c()*this->a32*this->a32 +
              from.f()*this->a22*this->a32 +
              from.g()*this->a12*this->a32 +
              from.h()*this->a12*this->a22) != to.b() * scalar) { return false; }
-    
+
         if ((from.a()*this->a13*this->a13 +
              from.b()*this->a23*this->a23 +
              from.c()*this->a33*this->a33 +
              from.f()*this->a23*this->a33 +
              from.g()*this->a13*this->a33 +
              from.h()*this->a13*this->a23) != to.c() * scalar) { return false; }
-    
+
         if ((2*from.a()*this->a12*this->a13 +
              2*from.b()*this->a22*this->a23 +
              2*from.c()*this->a32*this->a33 +
@@ -116,7 +116,7 @@ public:
              from.g()*this->a13*this->a32 +
              from.h()*this->a12*this->a23 +
              from.h()*this->a13*this->a22) != to.f() * scalar) { return false; }
-    
+
         if ((2*from.a()*this->a11*this->a13 +
              2*from.b()*this->a21*this->a23 +
              2*from.c()*this->a31*this->a33 +
@@ -126,7 +126,7 @@ public:
              from.g()*this->a13*this->a31 +
              from.h()*this->a11*this->a23 +
              from.h()*this->a13*this->a21) != to.g() * scalar) { return false; }
-    
+
         if ((2*from.a()*this->a11*this->a12 +
              2*from.b()*this->a21*this->a22 +
              2*from.c()*this->a31*this->a32 +
@@ -136,7 +136,7 @@ public:
              from.g()*this->a12*this->a31 +
              from.h()*this->a11*this->a22 +
              from.h()*this->a12*this->a21) != to.h() * scalar) { return false; }
-   
+
         return true;
     }
 
@@ -146,28 +146,28 @@ public:
         this->a23 += (this->a21 + this->a22);
         this->a33 += (this->a31 + this->a32);
     }
-    
+
     void A1t0010001(const R& t)
     {
         this->a12 += t * this->a11;
         this->a22 += t * this->a21;
         this->a32 += t * this->a31;
     }
-    
+
     void A10001t001(const R& t)
     {
         this->a13 += t * this->a12;
         this->a23 += t * this->a22;
         this->a33 += t * this->a32;
     }
-    
+
     void A10t010001(const R& t)
     {
         this->a13 += t * this->a11;
         this->a23 += t * this->a21;
         this->a33 += t * this->a31;
     }
-    
+
     void A0n0n0000n()
     {
         R temp;
@@ -175,7 +175,7 @@ public:
         temp = -this->a21; this->a21 = -this->a22; this->a22 = temp; this->a23 = -this->a23;
         temp = -this->a31; this->a31 = -this->a32; this->a32 = temp; this->a33 = -this->a33;
     }
-    
+
     void An0000n0n0()
     {
         R temp;
@@ -183,70 +183,70 @@ public:
         temp = -this->a22; this->a22 = -this->a23; this->a23 = temp; this->a21 = -this->a21;
         temp = -this->a32; this->a32 = -this->a33; this->a33 = temp; this->a31 = -this->a31;
     }
-    
+
     void An00010001()
     {
         this->a11 = -this->a11;
         this->a21 = -this->a21;
         this->a31 = -this->a31;
     }
-    
+
     void A1000n0001()
     {
         this->a12 = -this->a12;
         this->a22 = -this->a22;
         this->a32 = -this->a32;
     }
-    
+
     void A10001000n()
     {
         this->a13 = -this->a13;
         this->a23 = -this->a23;
         this->a33 = -this->a33;
     }
-    
+
     void An010n1001()
     {
         this->a13 += (this->a11 + this->a12); this->a11 = -this->a11; this->a12 = -this->a12;
         this->a23 += (this->a21 + this->a22); this->a21 = -this->a21; this->a22 = -this->a22;
         this->a33 += (this->a31 + this->a32); this->a31 = -this->a31; this->a32 = -this->a32;
     }
-    
+
     void Ann00n0001()
     {
         this->a12 += this->a11; this->a12 = -this->a12; this->a11 = -this->a11;
         this->a22 += this->a21; this->a22 = -this->a22; this->a21 = -this->a21;
         this->a32 += this->a31; this->a32 = -this->a32; this->a31 = -this->a31;
     }
-    
+
     void An0n01000n()
     {
         this->a13 += this->a11; this->a13 = -this->a13; this->a11 = -this->a11;
         this->a23 += this->a21; this->a23 = -this->a23; this->a21 = -this->a21;
         this->a33 += this->a31; this->a33 = -this->a33; this->a31 = -this->a31;
     }
-    
+
     void A1000nn00n()
     {
         this->a13 += this->a12; this->a13 = -this->a13; this->a12 = -this->a12;
         this->a23 += this->a22; this->a23 = -this->a23; this->a22 = -this->a22;
         this->a33 += this->a32; this->a33 = -this->a33; this->a32 = -this->a32;
     }
-    
+
     void Ann001000n()
     {
         this->a12 -= this->a11; this->a11 = -this->a11; this->a13 = -this->a13;
         this->a22 -= this->a21; this->a21 = -this->a21; this->a23 = -this->a23;
         this->a32 -= this->a31; this->a31 = -this->a31; this->a33 = -this->a33;
     }
-    
+
     void An0n0n0001()
     {
         this->a13 -= this->a11; this->a11 = -this->a11; this->a12 = -this->a12;
         this->a23 -= this->a21; this->a21 = -this->a21; this->a22 = -this->a22;
         this->a33 -= this->a31; this->a31 = -this->a31; this->a32 = -this->a32;
     }
-    
+
     void An000nn001()
     {
         this->a13 -= this->a12; this->a12 = -this->a12; this->a11 = -this->a11;
@@ -254,7 +254,7 @@ public:
         this->a33 -= this->a32; this->a32 = -this->a32; this->a31 = -this->a31;
     }
 
-    
+
     void A1000010n0()
     {
         R temp;
@@ -262,14 +262,14 @@ public:
         temp = this->a23; this->a23 = this->a22; this->a22 = -temp;
         temp = this->a33; this->a33 = this->a32; this->a32 = -temp;
     }
-    
+
     void A1000100t1(const R& t)
     {
         this->a12 += (this->a13 * t);
         this->a22 += (this->a23 * t);
         this->a32 += (this->a33 * t);
     }
-    
+
     void A100010t01(const R& t)
     {
         this->a11 += (this->a13 * t);

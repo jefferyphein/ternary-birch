@@ -396,7 +396,7 @@ static W64 GF2_solve_naive(const std::vector<W64>& vecs, W64 start, W64 target)
     W64 upper = 1LL << vecs.size();
     size_t num_vecs = vecs.size();
     for (W64 i=start+1; i<upper; i++)
-    {   
+    {
         W64 x = 0;
         W64 mask = upper >> 1;
         for (size_t j=0; j<num_vecs; j++)
@@ -406,7 +406,7 @@ static W64 GF2_solve_naive(const std::vector<W64>& vecs, W64 start, W64 target)
         }
 
         if (x == target) return i;
-    }   
+    }
 
     return 0;
 }
