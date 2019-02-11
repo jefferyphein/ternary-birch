@@ -73,7 +73,39 @@ Additionally, the underlying arithmetic within ``hecke_matrix`` is done using mu
 
     sage: D = g.hecke_matrix(73, 11*17, precise=False)
 
-**NOTE: While using native 64-bit precision can be considerably faster, it can overflow quite dramatically for large conductors and/or large primes. When computing in this mode, make sure to confirm the validity of your results in case of an overflow!**
+There is a mechanism in place to catch overflow issues when they occur, namely when computing p-neighbors, if the discriminants do not match an ``OverflowError`` exception is thrown.
+
+### Computing Hecke eigenvalues
+
+With a genus object constructed, you can recover its rational eigenvectors as follows:
+
+    sage: g = BirchGenus(5 * 7 * 11 * 13 * 17)
+    sage: evecs = g.rational_eigenvectors()
+
+This will return a list of dictionaries corresponding to each rational eigenvector. Each dictionary contains three keywords: ``aps``, ``vector``, and ``conductor``.
+- The ``aps`` keyword contains the vector's known eigenvalues, this is a dictionary indexed by the corresponding prime.
+- The ``vector`` keyword contains the column vector for the associated Hecke matrices.
+- The ``conductor`` keyword contains an integer corresponding to the conductor of the character from which it arose.
+
+The rational eigenvectors are stored internally so that additional calls to ``rational_eigenvectors`` do nothing. You can force recomputation of the rational eigenvectors with the ``force=True`` parameter.
+
+As with computing Hecke matrices, you can pass the ``precise`` keywoard to compute eigenvectors for reasonably small levels. **Note:** This only affects computing Hecke matrices and not the underlying linear algebra.
+
+    sage: evecs = g.rational_eigenvectors(precise=False)
+
+Once rational eigenvectors have been computed, you are ready to compute Hecke eigenvalues.
+
+    sage: g.compute_eigenvalues(101)
+
+This function does not return any values, but instead updates the internal state of the eigenvectors stored within the genus object. By printing the contents of ``evecs`` again, you can see that the eigenvalues are now present.
+
+    sage: print(evecs)
+
+You may also compute all eigenvalues up to a specific bound.
+
+    sage: g.compute_eigenvalues_upto(1000)
+
+Additionally, the ``compute_eigenvalues`` and ``compute_eigenvalues_upto`` functions accept a ``precise=False`` keyword argument to allow for even faster eigenvalue computations for reasonaly small level and primes.
 
 ### Accessing isometries for building custom Hecke matrices
 

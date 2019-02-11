@@ -100,6 +100,14 @@ public:
         }
 
         size_t num_vecs = this->eigenvectors.size();
+
+        // If there are no eigenvectors, then there's nothing to do.
+        if (num_vecs == 0)
+        {
+            this->finalized = true;
+            return;
+        }
+
         this->conductors.reserve(num_vecs);
 
         // First, we need to determine which coordinates will allow us to most
