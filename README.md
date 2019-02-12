@@ -89,7 +89,7 @@ This will return a list of dictionaries corresponding to each rational eigenvect
 
 The rational eigenvectors are stored internally so that additional calls to ``rational_eigenvectors`` do nothing. You can force recomputation of the rational eigenvectors with the ``force=True`` parameter.
 
-As with computing Hecke matrices, you can pass the ``precise`` keywoard to compute eigenvectors for reasonably small levels. **Note:** This only affects computing Hecke matrices and not the underlying linear algebra.
+As with computing Hecke matrices, you can pass the ``precise`` keyword to compute eigenvectors for reasonably small levels. **Note:** This only affects computing Hecke matrices and not the underlying linear algebra.
 
     sage: evecs = g.rational_eigenvectors(precise=False)
 
@@ -97,7 +97,7 @@ Once rational eigenvectors have been computed, you are ready to compute Hecke ei
 
     sage: g.compute_eigenvalues(101)
 
-This function does not return any values, but instead updates the internal state of the eigenvectors stored within the genus object. By printing the contents of ``evecs`` again, you can see that the eigenvalues are now present.
+This function has no return value, but instead updates the internal state of the eigenvectors stored within the genus object. By printing the contents of ``evecs`` again, you can see that the eigenvalues are now present.
 
     sage: print(evecs)
 
