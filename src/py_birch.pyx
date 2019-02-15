@@ -36,8 +36,11 @@ from sage.all import Integers, Rationals
 from sage.all import random_prime
 from sage.all import matrix
 from sage.all import next_prime
+from sage.all import GF
 
 from math import log, exp, lgamma
+
+HASSE_MULTIPLIER = 50
 
 cdef extern from "<utility>" namespace "std" nogil:
     T move[T](T)
@@ -235,11 +238,33 @@ cdef class BirchGenus:
         # The Hasse bound for our starting prime.
         hasse = int(floor(2*sqrt(1.0*p)))
 
+        # Pick a prime considerably larger than the absolute value of the Hasse
+        # bound. We do this to avoid exhausting over all possible eigenvalues,
+        # since this can get fairly costly for large primes p. Instead, we
+        # look for candidate eigenvalues by computing the roots of the
+        # characteristic polynomial of our Hecke matrix over some larger
+        # finite field q. By choosing a larger finite field, we reduce the
+        # probability of picking up incidental eigenvalues which do not
+        # actually correspond to rational eigenvectors.
+        q = next_prime(HASSE_MULTIPLIER * hasse)
+
         # Produce some initial jobs to get the ball rolling.
         job_queue = Queue()
         for conductor in self.dims:
             A = self.sage_hecke_matrix(p, conductor, precise=precise, sparse=sparse)
-            for e in range(-hasse, hasse+1):
+
+            logging.info("Looking for eigenvalues (p=%s, conductor: %s) over GF(%s)...", p, conductor, q)
+            start_time = datetime.now()
+
+            # Determine all possible eigenvalues within the Hasse bound.
+            roots = A.change_ring(GF(q)).characteristic_polynomial().roots()
+            roots = [ Integers()(pair[0]) for pair in roots ]
+            roots = [ rt-q if rt > hasse else rt for rt in roots ]
+            roots = [ rt for rt in roots if abs(rt) <= hasse ]
+            end_time = datetime.now()
+            logging.info("  found %s possible eigenvalue(s) (time: %s)", len(roots), end_time-start_time)
+
+            for e in roots:
                 job = dict()
                 job['p'] = p
                 job['e'] = e
@@ -303,12 +328,24 @@ cdef class BirchGenus:
             # apart using the Hecke matrix at the next good prime.
             p = self.next_good_prime(p)
 
+            hasse = int(floor(2*sqrt(1.0*p)))
+            q = next_prime(HASSE_MULTIPLIER*hasse)
+
             # Project the Hecke matrix onto the desired eigenspace.
             A = self.sage_hecke_matrix(p, conductor, precise=precise, sparse=sparse)
+
+            logging.info("Looking for eigenvalues (p=%s, conductor=%s) over GF(%s)...", p, conductor, q)
+            start_time = datetime.now()
+            roots = A.change_ring(GF(q)).characteristic_polynomial().roots()
+            roots = [ Integers()(pair[0]) for pair in roots ]
+            roots = [ rt-q if rt > hasse else rt for rt in roots ]
+            roots = [ rt for rt in roots if abs(rt) <= hasse ]
+            end_time = datetime.now()
+            logging.info("  found %s possible eigenvalue(s) (time: %s)", len(roots), end_time-start_time)
+
             A = A * S.transpose()
 
-            hasse = int(floor(2*sqrt(1.0*p)))
-            for e in range(-hasse, hasse+1):
+            for e in roots:
                 newjob = dict()
                 newjob['p'] = p
                 newjob['e'] = e
@@ -556,14 +593,22 @@ cdef class BirchGenus:
 
         logging.info("Converting numpy matrix to sage matrix (p=%s, conductor=%s)...", p, conductor)
 
-        # TODO: Figure out a better way to do this. Currently this relies on
-        # fact that the matrix constructor in Sage does not accept
-        # scipy.csr_matrix objects.
         start_time = datetime.now()
-        try:
-            B = matrix(A, sparse=False)
-        except Exception:
-            B = matrix(A.toarray(), sparse=True)
+        # Check whether A has the attributes of a sparse matrix.
+        if hasattr(A, 'indices') and hasattr(A, 'indptr'):
+            # Build a sparse matrix over the Integers(). This is considerably
+            # faster than calling matrix(Integers(), A.toarray(), sparse=True)
+            # as of 20180214.    ¯\_(ツ)_/¯
+            dim = self.dims[conductor]
+            B = matrix(Integers(), nrows=dim, ncols=dim, sparse=True)
+            pos = 0
+            for row,ptr in enumerate(A.indptr[1:]):
+                while pos < ptr:
+                    col = A.indices[pos]
+                    B.add_to_entry(row, col, A.data[pos])
+                    pos += 1
+        else:
+            B = matrix(Integers(), A, sparse=False)
         end_time = datetime.now()
 
         logging.info("  conversion time: %s", end_time-start_time)
