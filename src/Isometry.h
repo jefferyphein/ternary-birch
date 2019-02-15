@@ -84,6 +84,63 @@ public:
         return temp;
     }
 
+    QuadForm<R> transform(const QuadForm<R>& from, R scalar)
+    {
+        R a = from.a()*this->a11*this->a11 +
+            from.b()*this->a21*this->a21 +
+            from.c()*this->a31*this->a31 +
+            from.f()*this->a21*this->a31 +
+            from.g()*this->a11*this->a31 +
+            from.h()*this->a11*this->a21;
+
+        R b = from.a()*this->a12*this->a12 +
+             from.b()*this->a22*this->a22 +
+             from.c()*this->a32*this->a32 +
+             from.f()*this->a22*this->a32 +
+             from.g()*this->a12*this->a32 +
+             from.h()*this->a12*this->a22;
+
+        R c = from.a()*this->a13*this->a13 +
+             from.b()*this->a23*this->a23 +
+             from.c()*this->a33*this->a33 +
+             from.f()*this->a23*this->a33 +
+             from.g()*this->a13*this->a33 +
+             from.h()*this->a13*this->a23;
+
+        R f = 2*from.a()*this->a12*this->a13 +
+             2*from.b()*this->a22*this->a23 +
+             2*from.c()*this->a32*this->a33 +
+             from.f()*this->a22*this->a33 +
+             from.f()*this->a23*this->a32 +
+             from.g()*this->a12*this->a33 +
+             from.g()*this->a13*this->a32 +
+             from.h()*this->a12*this->a23 +
+             from.h()*this->a13*this->a22;
+
+        R g = 2*from.a()*this->a11*this->a13 +
+             2*from.b()*this->a21*this->a23 +
+             2*from.c()*this->a31*this->a33 +
+             from.f()*this->a21*this->a33 +
+             from.f()*this->a23*this->a31 +
+             from.g()*this->a11*this->a33 +
+             from.g()*this->a13*this->a31 +
+             from.h()*this->a11*this->a23 +
+             from.h()*this->a13*this->a21;
+
+        R h = 2*from.a()*this->a11*this->a12 +
+             2*from.b()*this->a21*this->a22 +
+             2*from.c()*this->a31*this->a32 +
+             from.f()*this->a21*this->a32 +
+             from.f()*this->a22*this->a31 +
+             from.g()*this->a11*this->a32 +
+             from.g()*this->a12*this->a31 +
+             from.h()*this->a11*this->a22 +
+             from.h()*this->a12*this->a21;
+
+        QuadForm<R> temp(a/scalar, b/scalar, c/scalar, f/scalar, g/scalar, h/scalar);
+        return temp;
+    }
+
     bool is_isometry(const QuadForm<R>& from, const QuadForm<R>& to, R scalar)
     {
          if ((from.a()*this->a11*this->a11 +
