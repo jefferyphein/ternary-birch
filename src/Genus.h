@@ -452,6 +452,8 @@ private:
 
         const GenusRep<R>& mother = this->hash->get(0);
 
+        const Z32 *stride_ptr = vector_manager.strided_eigenvectors.data();
+
         size_t num_indices = vector_manager.indices.size();
         for (size_t index=0; index<num_indices; index++)
         {
@@ -464,10 +466,10 @@ private:
 
                 size_t rpos = this->hash->indexof(foo);
                 size_t offset = vector_manager.stride * rpos;
-                __builtin_prefetch(&vector_manager.strided_eigenvectors[offset], 0, 0);
+                __builtin_prefetch(stride_ptr + offset, 0, 0);
 
                 W64 spin_vals;
-                if (rpos == npos)
+                if (unlikely(rpos == npos))
                 {
                     spin_vals = this->spinor->norm(foo.q, foo.s, p);
                 }
@@ -490,7 +492,7 @@ private:
                     W64 cond = vector_manager.conductors[vpos];
                     Z32 value = birch_util::char_val(spin_vals & cond);
                     Z32 coord = vector_manager.strided_eigenvectors[offset + vpos];
-                    if (coord)
+                    if (likely(coord))
                     {
                         eigenvalues[vpos] += (value * coord);
                     }
