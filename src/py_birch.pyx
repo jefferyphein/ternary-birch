@@ -215,6 +215,12 @@ cdef class BirchGenus:
     def dimensions(self):
         return self.dims
 
+    def dimension(self):
+        total = 0
+        for x in self.dims:
+            total += self.dims[x]
+        return total
+
     def seed(self):
         return self.seed_
 
@@ -244,7 +250,7 @@ cdef class BirchGenus:
         # look for candidate eigenvalues by computing the roots of the
         # characteristic polynomial of our Hecke matrix over some larger
         # finite field q. By choosing a larger finite field, we reduce the
-        # probability of picking up incidental eigenvalues which do not
+        # probability of picking up "incidental" eigenvalues which do not
         # actually correspond to rational eigenvectors.
         q = next_prime(HASSE_MULTIPLIER * hasse)
 
@@ -253,7 +259,7 @@ cdef class BirchGenus:
         for conductor in self.dims:
             A = self.sage_hecke_matrix(p, conductor, precise=precise, sparse=sparse)
 
-            logging.info("Looking for eigenvalues (p=%s, conductor: %s) over GF(%s)...", p, conductor, q)
+            logging.info("Looking for eigenvalues (p=%s, conductor=%s) over GF(%s)...", p, conductor, q)
             start_time = datetime.now()
 
             # Determine all possible eigenvalues within the Hasse bound.
@@ -598,7 +604,7 @@ cdef class BirchGenus:
         if hasattr(A, 'indices') and hasattr(A, 'indptr'):
             # Build a sparse matrix over the Integers(). This is considerably
             # faster than calling matrix(Integers(), A.toarray(), sparse=True)
-            # as of 20180214.    ¯\_(ツ)_/¯
+            # as of 20190214.    ¯\_(ツ)_/¯
             dim = self.dims[conductor]
             B = matrix(Integers(), nrows=dim, ncols=dim, sparse=True)
             pos = 0
