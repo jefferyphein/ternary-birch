@@ -777,6 +777,7 @@ private:
                 {
                     spin_vals = this->spinor->norm(foo.q, foo.s, p);
                 }
+                else continue;
 
                 all_spin_vals.push_back((r << num_primes) | spin_vals);
             }
