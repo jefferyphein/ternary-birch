@@ -740,13 +740,9 @@ private:
                 #endif
 
                 W64 spin_vals;
-                if (unlikely(r == n))
+                if (r > n)
                 {
-                    spin_vals = this->spinor->norm(foo.q, foo.s, p);
-                }
-                else if (r > n)
-                {
-                    W16_Vector3 result = manager.transform_vector(cur, foo, vec);
+                    W16_Vector3 result = manager.transform_vector(foo, vec);
                     vector_hash[r].add(result);
 
                     const GenusRep<R>& rep = this->hash->get(r);
@@ -777,7 +773,10 @@ private:
 
                     spin_vals = this->spinor->norm(mother.q, foo.s, scalar);
                 }
-                else continue;
+                else if (r == n)
+                {
+                    spin_vals = this->spinor->norm(foo.q, foo.s, p);
+                }
 
                 all_spin_vals.push_back((r << num_primes) | spin_vals);
             }
@@ -831,6 +830,10 @@ private:
                         }
                         else
                         {
+                            #ifdef DEBUG
+                            assert( (matrix[src] * col_auts) % row_auts == 0 );
+                            #endif
+
                             matrix[dst] = matrix[src] * col_auts / row_auts;
                         }
                     }

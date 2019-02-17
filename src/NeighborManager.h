@@ -135,6 +135,11 @@ public:
             }
         }
 
+        #ifdef DEBUG
+        QuadFormFp<R,S> qp = this->q.mod(GF);
+        assert( qp.evaluate(res) % this->GF->prime() == 0 );
+        #endif
+
         return res;
     }
 
@@ -146,12 +151,12 @@ public:
         return rep;
     }
 
-    Vector3<R> transform_vector(const GenusRep<T>& src, const GenusRep<T>& dst, Vector3<R> vec)
+    Vector3<R> transform_vector(const GenusRep<T>& dst, Vector3<R> src)
     {
         Vector3<T> temp;
-        temp.x = GF->mod(vec.x);
-        temp.y = GF->mod(vec.y);
-        temp.z = GF->mod(vec.z);
+        temp.x = GF->mod(src.x);
+        temp.y = GF->mod(src.y);
+        temp.z = GF->mod(src.z);
 
         R p = GF->prime();
 
@@ -168,6 +173,7 @@ public:
         temp.y /= p;
         temp.z /= p;
 
+        Vector3<R> vec;
         vec.x = GF->mod(temp.x);
         vec.y = GF->mod(temp.y);
         vec.z = GF->mod(temp.z);
@@ -184,7 +190,7 @@ public:
             vec.x = GF->mod(GF->mul(vec.x, inv));
             vec.y = 1;
         }
-        else
+        else if (vec.z != 0)
         {
             vec.x = 1;
         }
@@ -209,6 +215,10 @@ public:
         vec.x = GF->mod(vec2.x);
         vec.y = GF->mod(vec2.y);
         vec.z = GF->mod(vec2.z);
+
+        #ifdef DEBUG
+        assert( q.evaluate(vec) % p == 0 );
+        #endif
 
         if (vec.x > (p>>1)) vec.x -= p;
         if (vec.y > (p>>1)) vec.y -= p;

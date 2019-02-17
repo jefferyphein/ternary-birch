@@ -30,7 +30,8 @@ public:
     inline R mod(const T& a) const
     {
         static_assert(std::is_integral<T>::value, "Undefined type.");
-        return (a % p) + (a < 0 ? p : 0);
+        T value = (T)a % this->p;
+        return (value < 0) ? (R)(value+this->p) : (R)value;
     }
 
     template<typename T>
