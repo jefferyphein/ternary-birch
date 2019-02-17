@@ -127,8 +127,8 @@ cdef class BirchGenus:
     cdef EigenvectorManager[Z] Z_manager
     cdef EigenvectorManager[Z64] Z64_manager
     cpdef Z64_genus_is_set
-    cpdef level
-    cpdef ramified_primes
+    cpdef level_
+    cpdef ramified_primes_
     cpdef facs
     cpdef dims
     cpdef seed_
@@ -137,27 +137,27 @@ cdef class BirchGenus:
     cpdef eigenvectors
 
     def __init__(self, level, ramified_primes=None, seed=None):
-        self.level = Integer(level)
-        self.facs = self.level.factor()
+        self.level_ = Integer(level)
+        self.facs = self.level_.factor()
         ps = map(itemgetter(0), self.facs)
         es = map(itemgetter(1), self.facs)
 
         if ramified_primes is None:
             logging.info("Ramified primes: chosen automatically")
             if len(ps) % 2 == 0:
-                self.ramified_primes = ps[:-1]
+                self.ramified_primes_ = ps[:-1]
             else:
-                self.ramified_primes = ps[:]
+                self.ramified_primes_ = ps[:]
         else:
             logging.info("Ramified primes: specified by user")
-            self.ramified_primes = [ p for p in ramified_primes if p in ps ]
+            self.ramified_primes_ = [ p for p in ramified_primes if p in ps ]
 
         cdef vector[Z_PrimeSymbol] primes
         cdef Z_PrimeSymbol prime
         for n,p in enumerate(ps):
             prime.p = Z(Integer(p).value)
             prime.power = int(es[n])
-            prime.ramified = p in self.ramified_primes
+            prime.ramified = p in self.ramified_primes_
             primes.push_back(prime)
             logging.info("%s at %s", "Ramified" if prime.ramified else "Unramified", p)
 
@@ -221,13 +221,19 @@ cdef class BirchGenus:
             total += self.dims[x]
         return total
 
+    def level(self):
+        return self.level_
+
     def seed(self):
         return self.seed_
+
+    def ramified_primes(self):
+        return self.ramified_primes_
 
     def next_good_prime(self, p):
         while True:
             p = next_prime(p)
-            if self.level % p != 0:
+            if self.level_ % p != 0:
                 break
         return p
 
@@ -362,24 +368,18 @@ cdef class BirchGenus:
                 job_queue.put(newjob)
 
         # Set up the eigenvector manager so we can compute eigenvalues.
-        cdef vector[Z32] data
-        for entry in self.eigenvectors:
-            vec = entry['vector']
-            cond = entry['conductor']
-            dimension = len(vec)
-            data = vector[Z32](dimension)
-            for n,value in enumerate(vec):
-                data[n] = value
-            self.Z_manager.add_eigenvector(deref(self.Z_genus).eigenvector(data, Z(Integer(cond).value)))
-        self.Z_manager.finalize()
-
-        # TODO: Remove the Z64_manager calls and make it so that the
-        # Z64_manager can just copy the Z_manager.
+        self.reset_eigenvector_manager()
 
         return self.eigenvectors
 
     # TODO: Make it so that computing neighbors with 32-bit primes doesn't
     # crash when using precise=False.
+
+    def add_eigenvector(self, eigenvector):
+        if self.eigenvectors is None:
+            self.eigenvectors = []
+
+        self.eigenvectors.append(dict(eigenvector))
 
     def compute_eigenvalues(self, p, precise=True):
         prime = Integer(p)
@@ -387,7 +387,7 @@ cdef class BirchGenus:
         if not prime.is_prime():
             raise Exception("p is not prime.")
 
-        if self.level % prime == 0:
+        if self.level_ % prime == 0:
             raise Exception("Cannot compute eigenvalues at primes dividing the level.")
 
         # If we haven't already computed the eigenvectors, do so now.
@@ -422,6 +422,30 @@ cdef class BirchGenus:
             vec['aps'][prime] = aps[n]
 
         return [ aps[n] for n in range(aps.size()) ]
+
+    def reset_eigenvector_manager(self):
+        cdef EigenvectorManager[Z] _Z_manager
+        cdef EigenvectorManager[Z64] _Z64_manager
+
+        if not self.Z64_genus_is_set:
+            self.Z64_genus = make_shared[Genus[Z64]](deref(self.Z_genus))
+            self.Z64_genus_is_set = True
+
+        for entry in self.eigenvectors:
+            vec = entry['vector']
+            cond = entry['conductor']
+            dimension = len(vec)
+            data = vector[Z32](dimension)
+            for n,value in enumerate(vec):
+                data[n] = value
+            _Z64_manager.add_eigenvector(deref(self.Z64_genus).eigenvector(data, Integer(cond)))
+            _Z_manager.add_eigenvector(deref(self.Z_genus).eigenvector(data, Z(Integer(cond).value)))
+
+        _Z64_manager.finalize()
+        _Z_manager.finalize()
+
+        self.Z64_manager = _Z64_manager
+        self.Z_manager = _Z_manager
 
     def compute_eigenvalues_upto(self, upper, precise=True):
         ps = []
@@ -469,7 +493,7 @@ cdef class BirchGenus:
         if not prime.is_prime():
             raise Exception("p is not prime.")
 
-        if self.level % p == 0:
+        if self.level_ % p == 0:
             raise Exception("Cannot compute Hecke matrix at primes dividing the level.")
 
         if not precise:
@@ -540,10 +564,10 @@ cdef class BirchGenus:
         if not prime.is_prime():
             raise Exception("p is not prime.")
 
-        if self.level % conductor != 0:
+        if self.level_ % conductor != 0:
             raise Exception("Conductor must divide the level.")
 
-        if self.level % p == 0:
+        if self.level_ % p == 0:
             raise Exception("Cannot compute Hecke matrix at primes dividing the level.")
 
         if prime in self.hecke:
@@ -785,11 +809,11 @@ cdef class BirchGenus:
         return '''Birch genus with level {} = {}
 Ramified primes = {}
 Dimensions = {}
-Seed = {}'''.format(self.level, self.facs, self.ramified_primes, self.dims, self.seed_)
+Seed = {}'''.format(self.level_, self.facs, self.ramified_primes_, self.dims, self.seed_)
 
     def __reduce__(self):
         return (BirchGenus,
-            (self.level, self.ramified_primes, self.seed_),
+            (self.level_, self.ramified_primes_, self.seed_),
             self.__getstate__())
 
     def __getstate__(self):

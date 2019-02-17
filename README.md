@@ -39,9 +39,9 @@ While this library can compiled into a C++ library and used within applications,
 
 ### Loading within Sage
 
-To use in Sage, run the provided [src/py_birch.pyx](https://github.com/jefferyphein/ternary-birch/blob/master/src/py_birch.pyx) Cython wrapper within Sage. With your current path within the ``src`` directory:
+To use in Sage, attach the provided [src/py_birch.pyx](https://github.com/jefferyphein/ternary-birch/blob/master/src/py_birch.pyx) Cython wrapper within Sage. With your current path within the ``src`` directory:
 
-    sage: %runfile py_birch.pyx
+    sage: attach("py_birch.pyx")
 
 ### Constructing a genus:
 
