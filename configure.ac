@@ -1,4 +1,4 @@
-AC_INIT([birch],[2.0.0-beta.2])
+AC_INIT([birch],[2.0.0-beta.3])
 AM_INIT_AUTOMAKE([-Wall -Werror subdir-objects foreign])
 AC_PROG_CXX
 AM_PROG_AR
