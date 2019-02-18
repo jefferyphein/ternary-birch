@@ -447,7 +447,7 @@ cdef class BirchGenus:
         self.Z64_manager = _Z64_manager
         self.Z_manager = _Z_manager
 
-    def compute_eigenvalues_upto(self, upper, precise=True):
+    def compute_eigenvalues_upto(self, upper, precise=True, force=False):
         ps = []
         p = 1
         while True:
@@ -479,6 +479,10 @@ cdef class BirchGenus:
 
         cdef vector[Z32] aps
         for p in ps:
+            # Skip this prime if all eigenvectors already has its eigenvalue.
+            if not force and all(p in vec['aps'] for vec in self.eigenvectors):
+                continue
+
             if precise:
                 aps = deref(self.Z_genus).eigenvalues(self.Z_manager, Z(Integer(p).value))
             else:
