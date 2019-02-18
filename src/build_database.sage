@@ -5,7 +5,7 @@ import logging
 
 from functools import reduce
 
-from sage.all import vector
+from sage.all import vector as sage_vector
 from sage.all import Integers
 from sage.all import Integer
 
@@ -101,37 +101,50 @@ class EigenvectorDatabase:
             # Compute eigenvalues up to a specific bound so that we can
             # distinguish oldforms from newforms.
             # TODO: This should probably be the Sturm bound???
+            # NOTE: Probably doesn't matter, as long as we compute *enough*
+            #   eigenvalues to allow us to easily identify the duplicates that
+            #   we know will be present.
             genus.compute_eigenvalues_upto(100, precise=precise)
 
             # If there are an even number of ramified primes, we need to remove
             # oldforms.
             if remove_oldforms:
+                # Due to the way that we have chosen ramified primes, oldforms
+                # will only occur when the level (assumed squarefree) is the
+                # product of an even number of primes. In this case, we have
+                # assumed that all but the largest prime factor is ramified,
+                # and so oldforms will occur exactly twice to account for the
+                # additional Atkin-Lehner sign we've introduced at the
+                # unramified prime.
+                #
+                # For example, at level p*q with p<q, oldforms arise from
+                # level p with the A-L sign inherited from level p. A newform
+                # at level p with - sign will then occur at level p*q with
+                # signs -+ and -- at level p*q.
+                #
+                # This means that we can easily identify oldforms due to their
+                # multiplicity and remove them directly without having to check
+                # for duplicates at level p.
+
                 # Determine the oldform level.
                 old_level = reduce(operator.mul, genus.ramified_primes())
 
                 # If the old level and the current new level match, do nothing.
                 if old_level != level:
-                    old_genus = self.get_genus_with_eigenvectors(old_level, precise=precise)
-                    old_evecs = old_genus.rational_eigenvectors(precise=precise)
+                    # Determine the large unramified prime.
+                    q = level // old_level
 
-                    # Identify any oldforms.
-                    removal = []
-                    for n,vec in enumerate(evecs):
-                        found = False
-                        for oldvec in old_evecs:
-                            if not found and EigenvectorDatabase.compare_eigenvalues(vec['aps'], oldvec['aps']):
-                                found = True
-                        if found:
-                            removal.append(n)
+                    # Identify eigenvectors with duplicate eigenvalues.
+                    removal = sorted(EigenvectorDatabase.identify_duplicates(evecs, q))
 
-                    # Remove oldforms.
+                    # Remove oldforms, starting at the end of the list.
                     for n in removal[::-1]:
                         del evecs[n]
 
+                    # Since we may have removed some eigenvectors, we must
+                    # reset the eigenvector manager before we can compute
+                    # eigenvalues again.
                     if len(removal) > 0:
-                        # Since we've removed some eigenvectors, we must reset
-                        # the eigenvector manager before we can compute more
-                        # eigenvalues.
                         genus.reset_eigenvector_manager()
 
             try:
@@ -279,14 +292,25 @@ class EigenvectorDatabase:
         c.execute(EigenvectorDatabase.CREATE_INDEX_EIGENVALUES)
 
     ###########################################################################
-    # Static helper function for matching eigenvalues.
+    # Static helper function for identifying eigenvectors with duplicate
+    # eigenvectors.
 
     @staticmethod
-    def compare_eigenvalues(newform, oldform):
-        for p,value in newform.items():
-            if p in oldform and oldform[p] != newform[p]:
-                return False
-        return True
+    def identify_duplicates(vectors, prime):
+        removal = []
+        for n,vec1 in enumerate(vectors):
+            cond = vec1['conductor']
+            if cond % prime != 0: continue
+            for m,vec2 in enumerate(vectors):
+                if vec2['conductor'] * prime != cond: continue
+                match = True
+                for p,value in vec1['aps'].items():
+                    if match and p in vec2['aps'] and value != vec2['aps'][p]:
+                        match = False
+                if match:
+                    removal.append(n)
+                    removal.append(m)
+        return removal
 
     ###########################################################################
     # Static helper methods used for packing/unpacking data to/from database.
@@ -305,7 +329,7 @@ class EigenvectorDatabase:
 
     @staticmethod
     def unpack_vector(s):
-        return vector(Integers(), map(int, s.split(",")))
+        return sage_vector(Integers(), map(int, s.split(",")))
 
 ###############################################################################
 # Do stuff.
