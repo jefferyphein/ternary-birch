@@ -39,13 +39,13 @@ While this library can compiled into a C++ library and used within applications,
 
 ### Building for use within Sage
 
-To use in Sage, you will need to install this package to your local Sage distribution. Within the ``src'' directory, run the following command:
+To use in Sage, you will need to install this package to your local Sage distribution. Within the ``src`` directory, run the following command:
 
     sage setup.py install --user
 
 Once this finishes, from within Sage:
 
-    sage: import ternary_birch
+    sage: from ternary_birch import BirchGenus
 
 ### Constructing a genus:
 
