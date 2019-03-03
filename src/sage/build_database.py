@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from functools import reduce
 
+import sage.all
 from ternary_birch import BirchGenus
 
 from sage.all import vector as sage_vector
