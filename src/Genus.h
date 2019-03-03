@@ -457,7 +457,7 @@ private:
         size_t num_indices = vector_manager.indices.size();
         for (size_t index=0; index<num_indices; index++)
         {
-            Z64 npos = vector_manager.indices[index];
+            size_t npos = static_cast<size_t>(vector_manager.indices[index]);
             const GenusRep<R>& cur = this->hash->get(npos);
             NeighborManager<S,T,R> neighbor_manager(cur.q, GF);
             for (W64 t=0; t<=prime; t++)

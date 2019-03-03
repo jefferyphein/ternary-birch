@@ -3,7 +3,10 @@ import operator
 import array
 import logging
 
+from datetime import datetime
 from functools import reduce
+
+from ternary_birch import BirchGenus
 
 from sage.all import vector as sage_vector
 from sage.all import Integers

@@ -37,11 +37,15 @@ See [Usage](#usage).
 
 While this library can compiled into a C++ library and used within applications, it was specifically designed to be integrated into Sage.
 
-### Loading within Sage
+### Building for use within Sage
 
-To use in Sage, attach the provided [src/py_birch.pyx](https://github.com/jefferyphein/ternary-birch/blob/master/src/py_birch.pyx) Cython wrapper within Sage. With your current path within the ``src`` directory:
+To use in Sage, you will need to install this package to your local Sage distribution. Within the ``src'' directory, run the following command:
 
-    sage: attach("py_birch.pyx")
+    sage setup.py install --user
+
+Once this finishes, from within Sage:
+
+    sage: import ternary_birch
 
 ### Constructing a genus:
 
