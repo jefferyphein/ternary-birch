@@ -137,10 +137,16 @@ cdef class BirchGenus:
     cpdef eigenvectors
 
     def __init__(self, level, ramified_primes=None, seed=None):
+        """
+        EXAMPLES::
+
+            sage: from ternary_birch import BirchGenus
+            sage: g = BirchGenus(11*13*17*19*23)
+        """
         self.level_ = Integer(level)
         self.facs = self.level_.factor()
-        ps = map(itemgetter(0), self.facs)
-        es = map(itemgetter(1), self.facs)
+        ps = list(map(itemgetter(0), self.facs))
+        es = list(map(itemgetter(1), self.facs))
 
         if ramified_primes is None:
             logging.info("Ramified primes: chosen automatically")
