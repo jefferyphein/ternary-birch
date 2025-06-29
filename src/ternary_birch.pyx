@@ -1,6 +1,6 @@
 # distutils: language = c++
 # distutils: sources = birch_util.cpp Fp.cpp Isometry.cpp Math.cpp QuadForm.cpp SetCover.cpp
-# distutils: extra_compile_args = -g -Wall -Werror -std=c++11 -fvar-tracking-assignments-toggle
+# distutils: extra_compile_args = -g -O3 -Wall -Werror -std=c++11 -fvar-tracking-assignments-toggle
 
 from __future__ import print_function
 

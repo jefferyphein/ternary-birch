@@ -12,8 +12,8 @@
 #
 
 FROM sagemath/sagemath:latest
-COPY . /var/src/birch
-WORKDIR /var/src/birch/src
+COPY ./src /var/src/birch
+WORKDIR /var/src/birch
 RUN sudo sage setup.py install
 WORKDIR /home/sage
 USER root
