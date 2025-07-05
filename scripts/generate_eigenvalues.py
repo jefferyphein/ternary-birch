@@ -78,8 +78,9 @@ class Stopwatch:
         finally:
             stopwatch.stop()
 
+
 def is_squarefree(n: int, *, num_primes: int | None = None):
-    """Determine whether provided integer is squarefree with correct number of divisors."""
+    """Whether provided integer is squarefree with correct number of divisors."""
     primes = Integer(n).prime_divisors()
     # Is n squarefree?
     if reduce(operator.mul, primes) != n:
@@ -148,7 +149,10 @@ def find_rational_eigenvectors(job: Job) -> JobResult:
     job.elapsed_seconds_eigenvalues = stopwatch_eigenvalues.elapsed()
     return JobResult(
         job=job,
-        dimensions_by_conductor={int(conductor): int(dimension) for conductor, dimension in genus.dimensions().items()},
+        dimensions_by_conductor={
+            int(conductor): int(dimension)
+            for conductor, dimension in genus.dimensions().items()
+        },
         dimension_total=int(genus.dimension()),
         rational_eigenvectors_count=len(vecs),
         rational_eigenvectors=normalize_vectors(vecs),
@@ -180,7 +184,15 @@ if __name__ == "__main__":
         help="Upper bound of integers to check",
     )
     parser.add_argument("--num-primes", type=int, required=False, default=None)
-    parser.add_argument("--upto", type=int, default=None, help="Compute eigenvalues up to this bound. Defaults to the Sturm bound for the level.")
+    parser.add_argument(
+        "--upto",
+        type=int,
+        default=None,
+        help=(
+            "Compute eigenvalues up to this bound. "
+            "Defaults to the Sturm bound for the level."
+        ),
+    )
     parser.add_argument(
         "--seed", type=int, required=False, default=random.randint(0, 2**32 - 1)
     )
@@ -193,8 +205,13 @@ if __name__ == "__main__":
     pool = ProcessPoolExecutor(max_workers=args.max_workers)
 
     # Generate list of squarefree primes.
-    squarefree_primes = filter(partial(is_squarefree, num_primes=args.num_primes), range(args.lower, args.upper))
-    jobs = map(partial(generate_jobs, seed=args.seed, upto=args.upto), squarefree_primes)
+    squarefree_primes = filter(
+        partial(is_squarefree, num_primes=args.num_primes),
+        range(args.lower, args.upper),
+    )
+    jobs = map(
+        partial(generate_jobs, seed=args.seed, upto=args.upto), squarefree_primes
+    )
     tasks = [pool.submit(find_rational_eigenvectors, job=job) for job in jobs]
     LOGGER.info("Submitting %s tasks using %s worker(s)", len(tasks), args.max_workers)
     for n, task in enumerate(as_completed(tasks)):
@@ -206,4 +223,9 @@ if __name__ == "__main__":
             savepath = args.savepath / f"{result.job.level}.json"
             with open(savepath, "w") as f:
                 f.write(result.json())
-            LOGGER.info("(%s / %s) Finished computing eigenvalues at level %s", n+1, len(tasks), result.job.level)
+            LOGGER.info(
+                "(%s / %s) Finished computing eigenvalues at level %s",
+                n + 1,
+                len(tasks),
+                result.job.level,
+            )
