@@ -149,13 +149,13 @@ cdef class BirchGenus:
         es = list(map(itemgetter(1), self.facs))
 
         if ramified_primes is None:
-            logging.info("Ramified primes: chosen automatically")
+            logging.debug("Ramified primes: chosen automatically")
             if len(ps) % 2 == 0:
                 self.ramified_primes_ = ps[:-1]
             else:
                 self.ramified_primes_ = ps[:]
         else:
-            logging.info("Ramified primes: specified by user")
+            logging.debug("Ramified primes: specified by user")
             self.ramified_primes_ = [ p for p in ramified_primes if p in ps ]
 
         cdef vector[Z_PrimeSymbol] primes
@@ -165,11 +165,11 @@ cdef class BirchGenus:
             prime.power = int(es[n])
             prime.ramified = p in self.ramified_primes_
             primes.push_back(prime)
-            logging.info("%s at %s", "Ramified" if prime.ramified else "Unramified", p)
+            logging.debug("%s at %s", "Ramified" if prime.ramified else "Unramified", p)
 
         cdef Z_QuadForm q
         try:
-            logging.info("Determining desired quadratic form")
+            logging.debug("Determining desired quadratic form")
             q = Z_QuadForm.get_quad_form(primes)
             a = _Z_to_int(q.a())
             b = _Z_to_int(q.b())
@@ -190,20 +190,20 @@ cdef class BirchGenus:
                 S += " {} {}xz".format("+" if g > 0 else "-", abs(g) if abs(g) != 1 else "")
             if h:
                 S += " {} {}xy".format("+" if h > 0 else "-", abs(h) if abs(h) != 1 else "")
-            logging.info(S)
+            logging.debug(S)
         except Exception as e:
             raise Exception(e.message)
 
         seed = seed if seed else 0
         cdef W64 arg_seed = seed
 
-        logging.info("Computing genus representatives...")
+        logging.debug("Computing genus representatives...")
         genus_start = datetime.now()
         self.Z_genus = make_shared[Genus[Z]](q, primes, arg_seed)
         genus_stop = datetime.now()
-        logging.info("Finished computing genus representatives (time: %s)", genus_stop-genus_start)
+        logging.debug("Finished computing genus representatives (time: %s)", genus_stop-genus_start)
         self.seed_ = deref(self.Z_genus).seed()
-        logging.info("Seed = %s (%s)", self.seed_, "provided by user" if seed else "set randomly")
+        logging.debug("Seed = %s (%s)", self.seed_, "provided by user" if seed else "set randomly")
 
         cdef cppmap[Z,size_t] mymap = deref(self.Z_genus).dimension_map()
         cdef cppmap[Z,size_t].iterator it = mymap.begin()
@@ -271,7 +271,7 @@ cdef class BirchGenus:
         for conductor in self.dims:
             A = self.sage_hecke_matrix(p, conductor, precise=precise, sparse=sparse)
 
-            logging.info("Looking for eigenvalues (p=%s, conductor=%s) over GF(%s)...", p, conductor, q)
+            logging.debug("Looking for eigenvalues (p=%s, conductor=%s) over GF(%s)...", p, conductor, q)
             start_time = datetime.now()
 
             # Determine all possible eigenvalues within the Hasse bound.
@@ -280,7 +280,7 @@ cdef class BirchGenus:
             roots = [ rt-q if rt > hasse else rt for rt in roots ]
             roots = [ rt for rt in roots if abs(rt) <= hasse ]
             end_time = datetime.now()
-            logging.info("  found %s possible eigenvalue(s) (time: %s)", len(roots), end_time-start_time)
+            logging.debug("  found %s possible eigenvalue(s) (time: %s)", len(roots), end_time-start_time)
 
             for e in roots:
                 job = dict()
@@ -303,7 +303,7 @@ cdef class BirchGenus:
             conductor = job['conductor']
             subspace = job['subspace']
 
-            logging.info("Computing kernel of %s-matrix (p=%s, conductor=%s, eigenvalue=%s)...", matrix.dimensions(), p, conductor, e)
+            logging.debug("Computing kernel of %s-matrix (p=%s, conductor=%s, eigenvalue=%s)...", matrix.dimensions(), p, conductor, e)
 
             # Find the rational eigenspace with the specified value.
             start_time = datetime.now()
@@ -317,7 +317,7 @@ cdef class BirchGenus:
 
             # Nothing to do if there is no eigenspace.
             if dim == 0:
-                logging.info("  trivial kernel found (time: %s)", end_time-start_time)
+                logging.debug("  trivial kernel found (time: %s)", end_time-start_time)
                 continue
 
             # Assign the eigenvalue to a new dictionary.
@@ -331,7 +331,7 @@ cdef class BirchGenus:
                 S = S * subspace
 
             if dim == 1:
-                logging.info("  eigenvector found (time: %s)", end_time-start_time)
+                logging.debug("  eigenvector found (time: %s)", end_time-start_time)
 
                 x = dict()
                 x['vector'] = S[0]
@@ -340,7 +340,7 @@ cdef class BirchGenus:
                 self.eigenvectors.append(x)
                 continue
 
-            logging.info("  %s-dimensional eigenspace found (time: %s)", S.dimensions()[0], end_time-start_time)
+            logging.debug("  %s-dimensional eigenspace found (time: %s)", S.dimensions()[0], end_time-start_time)
 
             # If we found a multi-dimensional eigenspace, we need to break it
             # apart using the Hecke matrix at the next good prime.
@@ -352,14 +352,14 @@ cdef class BirchGenus:
             # Project the Hecke matrix onto the desired eigenspace.
             A = self.sage_hecke_matrix(p, conductor, precise=precise, sparse=sparse)
 
-            logging.info("Looking for eigenvalues (p=%s, conductor=%s) over GF(%s)...", p, conductor, q)
+            logging.debug("Looking for eigenvalues (p=%s, conductor=%s) over GF(%s)...", p, conductor, q)
             start_time = datetime.now()
             roots = A.change_ring(GF(q)).characteristic_polynomial().roots()
             roots = [ Integers()(pair[0]) for pair in roots ]
             roots = [ rt-q if rt > hasse else rt for rt in roots ]
             roots = [ rt for rt in roots if abs(rt) <= hasse ]
             end_time = datetime.now()
-            logging.info("  found %s possible eigenvalue(s) (time: %s)", len(roots), end_time-start_time)
+            logging.debug("  found %s possible eigenvalue(s) (time: %s)", len(roots), end_time-start_time)
 
             A = A * S.transpose()
 
@@ -508,7 +508,7 @@ cdef class BirchGenus:
 
         if not precise:
             if not self.Z64_genus_is_set:
-                logging.info("Converting arbitrary precision Genus object to fixed-precision Genus object...")
+                logging.debug("Converting arbitrary precision Genus object to fixed-precision Genus object...")
                 self.Z64_genus = make_shared[Genus[Z64]](deref(self.Z_genus))
                 self.Z64_genus_is_set = True
 
@@ -588,33 +588,33 @@ cdef class BirchGenus:
 
         if sparse is None:
             density = self._estimated_density(p, conductor)
-            logging.info("Hecke matrix density estimate at p=%s: %s%%", prime, density * 100.0)
+            logging.debug("Hecke matrix density estimate at p=%s: %s%%", prime, density * 100.0)
             sparse = density <= 0.3
-            logging.info("Based on density estimates, computing %s matrices", "sparse" if sparse else "dense")
+            logging.debug("Based on density estimates, computing %s matrices", "sparse" if sparse else "dense")
 
         if not precise:
             if not self.Z64_genus_is_set:
-                logging.info("Converting arbitrary precision Genus object to fixed-precision Genus object...")
+                logging.debug("Converting arbitrary precision Genus object to fixed-precision Genus object...")
                 self.Z64_genus = make_shared[Genus[Z64]](deref(self.Z_genus))
                 self.Z64_genus_is_set = True
 
             start_time = datetime.now()
             if sparse:
-                logging.info("Computing Hecke matrices (p=%s, sparse, int64_t)...", prime)
+                logging.debug("Computing Hecke matrices (p=%s, sparse, int64_t)...", prime)
                 self._hecke_matrix_sparse_imprecise(prime)
             else:
-                logging.info("Computing Hecke matrices (p=%s, dense, int64_t)...", prime)
+                logging.debug("Computing Hecke matrices (p=%s, dense, int64_t)...", prime)
                 self._hecke_matrix_dense_imprecise(prime)
         else:
             start_time = datetime.now()
             if sparse:
-                logging.info("Computing Hecke matrices (p=%s, sparse, arbitrary)...", prime)
+                logging.debug("Computing Hecke matrices (p=%s, sparse, arbitrary)...", prime)
                 self._hecke_matrix_sparse_precise(prime)
             else:
-                logging.info("Computing Hecke matrices (p=%s, dense, arbitrary)...", prime)
+                logging.debug("Computing Hecke matrices (p=%s, dense, arbitrary)...", prime)
                 self._hecke_matrix_dense_precise(prime)
         end_time = datetime.now()
-        logging.info("Finished computing Hecke matrices at p=%s (time: %s)", prime, end_time-start_time)
+        logging.debug("Finished computing Hecke matrices at p=%s (time: %s)", prime, end_time-start_time)
 
         if conductor in self.hecke[prime]:
             return self.hecke[prime][conductor]
@@ -631,7 +631,7 @@ cdef class BirchGenus:
         # Get the desired Hecke matrix and convert it into a sage matrix object.
         A = self.hecke_matrix(p, conductor, precise=precise, sparse=sparse)
 
-        logging.info("Converting numpy matrix to sage matrix (p=%s, conductor=%s)...", p, conductor)
+        logging.debug("Converting numpy matrix to sage matrix (p=%s, conductor=%s)...", p, conductor)
 
         start_time = datetime.now()
         # Check whether A has the attributes of a sparse matrix.
@@ -651,7 +651,7 @@ cdef class BirchGenus:
             B = matrix(Integers(), A, sparse=False)
         end_time = datetime.now()
 
-        logging.info("  conversion time: %s", end_time-start_time)
+        logging.debug("  conversion time: %s", end_time-start_time)
 
         if not prime in self.sage_hecke:
             self.sage_hecke[prime] = dict()
@@ -667,7 +667,7 @@ cdef class BirchGenus:
             start_time = datetime.now()
             mymap = deref(self.Z_genus).hecke_matrix_dense(Z(p.value))
             end_time = datetime.now()
-            logging.info("  call time: %s", end_time-start_time)
+            logging.debug("  call time: %s", end_time-start_time)
             self.hecke[p] = dict()
         except Exception as e:
             raise Exception(e.message)
@@ -680,7 +680,7 @@ cdef class BirchGenus:
             incr(it)
 
         end_time = datetime.now()
-        logging.info("  copy time: %s", end_time-start_time)
+        logging.debug("  copy time: %s", end_time-start_time)
 
     def _hecke_matrix_dense_imprecise(self, Integer p):
         cdef cppmap[Z64,vector[int]] mymap
@@ -690,7 +690,7 @@ cdef class BirchGenus:
             start_time = datetime.now()
             mymap = deref(self.Z64_genus).hecke_matrix_dense(p)
             end_time = datetime.now()
-            logging.info("  call time: %s", end_time-start_time)
+            logging.debug("  call time: %s", end_time-start_time)
             self.hecke[p] = dict()
         except Exception as e:
             raise Exception(e.message)
@@ -703,7 +703,7 @@ cdef class BirchGenus:
             incr(it)
 
         end_time = datetime.now()
-        logging.info("  copy time: %s", end_time-start_time)
+        logging.debug("  copy time: %s", end_time-start_time)
 
     def _hecke_matrix_sparse_precise(self, Integer p):
         cdef cppmap[Z,vector[vector[int]]] mymap
@@ -713,7 +713,7 @@ cdef class BirchGenus:
             start_time = datetime.now()
             mymap = deref(self.Z_genus).hecke_matrix_sparse(Z(p.value))
             end_time = datetime.now()
-            logging.info("  call time: %s", end_time-start_time)
+            logging.debug("  call time: %s", end_time-start_time)
             self.hecke[p] = dict()
         except Exception as e:
             raise Exception(e.message)
@@ -743,7 +743,7 @@ cdef class BirchGenus:
             incr(it)
 
         end_time = datetime.now()
-        logging.info("  copy time: %s", end_time-start_time)
+        logging.debug("  copy time: %s", end_time-start_time)
 
     def _hecke_matrix_sparse_imprecise(self, Integer p):
         cdef cppmap[Z64,vector[vector[int]]] mymap
@@ -753,7 +753,7 @@ cdef class BirchGenus:
             start_time = datetime.now()
             mymap = deref(self.Z64_genus).hecke_matrix_sparse(p)
             end_time = datetime.now()
-            logging.info("  call time: %s", end_time-start_time)
+            logging.debug("  call time: %s", end_time-start_time)
             self.hecke[p] = dict()
         except Exception as e:
             raise Exception(e.message)
@@ -783,7 +783,7 @@ cdef class BirchGenus:
             incr(it)
 
         end_time = datetime.now()
-        logging.info("  copy time: %s", end_time-start_time)
+        logging.debug("  copy time: %s", end_time-start_time)
 
     def _estimated_density(self, p, conductor):
         if p == 2: p=p+1
