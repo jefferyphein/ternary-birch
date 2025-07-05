@@ -25,31 +25,21 @@ class Job:
     seed: int
     ramified_primes: list[int]
     ramified_primes_product: int
+    unramified_primes: list[int]
+    unramified_primes_product: int
     sturm_bound_of_ramified_primes_product: int
-
-
-@dataclass
-class SubJob:
-    level: int
-    seed: int
-    sturm_bound: int
+    eigenvalues_upto: int
+    elapsed_seconds: float | None = None
+    elapsed_seconds_genus: float | None = None
+    elapsed_seconds_eigenvectors: float | None = None
+    elapsed_seconds_eigenvalues: float | None = None
 
 
 @dataclass
 class JobResult:
     job: Job
-    elapsed_seconds: float
-    rational_eigenvectors_count: int
-    rational_eigenvectors: list[dict]
-
-    def json(self, **kwargs) -> str:
-        return json.dumps(asdict(self), **kwargs)
-
-
-@dataclass
-class SubJobResult:
-    subjob: SubJob
-    elapsed_seconds: float
+    dimensions_by_conductor: dict[int, int]
+    dimension_total: int
     rational_eigenvectors_count: int
     rational_eigenvectors: list[dict]
 
@@ -88,51 +78,40 @@ class Stopwatch:
         finally:
             stopwatch.stop()
 
-
-def is_squarefree_six_prime(n: int) -> bool:
-    """Determines whether provided integer is squarefree with six prime divisors."""
+def is_squarefree(n: int, *, num_primes: int | None = None):
+    """Determine whether provided integer is squarefree with correct number of divisors."""
     primes = Integer(n).prime_divisors()
-    # Does n has six prime divisors?
-    if len(primes) != 6:
-        return False
     # Is n squarefree?
-    return reduce(operator.mul, primes) == n
+    if reduce(operator.mul, primes) != n:
+        return False
+    if num_primes is not None:
+        return len(primes) == num_primes
+    return True
 
 
-def generate_jobs(level: int, seed: int) -> Job:
+def generate_jobs(level: int, *, seed: int, upto: int | None = None) -> Job:
     """Generate jobs for calculating rational eigenvectors at the provided level.
 
     Preconditions:
         - level is squarefree
-        - level has an even number of prime divisors
 
     """
     primes = Integer(level).prime_divisors()
-    ramified_primes = sorted(primes)[:-1]
+    ramified_primes = sorted(primes)[:-1] if len(primes) % 2 == 0 else sorted(primes)
     ramified_primes_product = reduce(operator.mul, ramified_primes)
+    unramified_primes = [sorted(primes)[-1]] if len(primes) % 2 == 0 else []
+    unramified_primes_product = reduce(operator.mul, unramified_primes, 1)
+    the_sturm_bound = sturm_bound(ramified_primes_product, 2)
+    upto = min(upto or the_sturm_bound, the_sturm_bound)
     return Job(
         level=level,
         seed=seed,
         ramified_primes=list(map(int, ramified_primes)),
         ramified_primes_product=int(ramified_primes_product),
-        sturm_bound_of_ramified_primes_product=int(
-            sturm_bound(ramified_primes_product, 2)
-        ),
-    )
-
-
-def generate_subjobs(level: int, seed: int) -> SubJob:
-    """Generate subjobs for calculating rational eigenvectors at a fully ramified level.
-
-    Preconditions:
-        - level is squarefree
-        - level has an odd number of prime divisors
-
-    """
-    return SubJob(
-        level=level,
-        seed=seed,
-        sturm_bound=int(sturm_bound(level, 2)),
+        unramified_primes=list(map(int, unramified_primes)),
+        unramified_primes_product=int(unramified_primes_product),
+        eigenvalues_upto=int(upto),
+        sturm_bound_of_ramified_primes_product=int(the_sturm_bound),
     )
 
 
@@ -150,7 +129,6 @@ def find_rational_eigenvectors(job: Job) -> JobResult:
 
     Preconditions:
         - job.level is squarefree
-        - job.level has an even number of prime divisors
 
     Calculates as many eigenvalues as needed according to the Sturm bound of the fully
     ramified level. For example, if level = p*q with p<q, calculate all eigenvalues up
@@ -158,41 +136,32 @@ def find_rational_eigenvectors(job: Job) -> JobResult:
 
     """
     with Stopwatch.contextmanager() as stopwatch:
-        genus = BirchGenus(job.level, seed=job.seed)
-        vecs = genus.rational_eigenvectors()
-        genus.compute_eigenvalues_upto(job.sturm_bound_of_ramified_primes_product)
+        with Stopwatch.contextmanager() as stopwatch_genus:
+            genus = BirchGenus(job.level, seed=job.seed)
+        with Stopwatch.contextmanager() as stopwatch_eigenvectors:
+            vecs = genus.rational_eigenvectors()
+        with Stopwatch.contextmanager() as stopwatch_eigenvalues:
+            genus.compute_eigenvalues_upto(job.eigenvalues_upto)
+    job.elapsed_seconds = stopwatch.elapsed()
+    job.elapsed_seconds_genus = stopwatch_genus.elapsed()
+    job.elapsed_seconds_eigenvectors = stopwatch_eigenvectors.elapsed()
+    job.elapsed_seconds_eigenvalues = stopwatch_eigenvalues.elapsed()
     return JobResult(
         job=job,
-        elapsed_seconds=stopwatch.elapsed(),
-        rational_eigenvectors_count=len(vecs),
-        rational_eigenvectors=normalize_vectors(vecs),
-    )
-
-
-def find_rational_eigenvectors_at_fully_ramified_level(subjob: SubJob) -> SubJobResult:
-    """Find all rational eigenvectors and calculate eigenvalues up to Sturm bound.
-
-    Preconditions:
-        - subjob.level is squarefree
-        - subjob.level has an odd number of prime divisors
-
-    Calculates as many eigenvalues as needed according to the Sturm bound of the level.
-
-    """
-    with Stopwatch.contextmanager() as stopwatch:
-        genus = BirchGenus(subjob.level, seed=subjob.seed)
-        vecs = genus.rational_eigenvectors()
-        the_sturm_bound = sturm_bound(subjob.level, 2)
-        genus.compute_eigenvalues_upto(the_sturm_bound)
-    return SubJobResult(
-        subjob=subjob,
-        elapsed_seconds=stopwatch.elapsed(),
+        dimensions_by_conductor={int(conductor): int(dimension) for conductor, dimension in genus.dimensions().items()},
+        dimension_total=int(genus.dimension()),
         rational_eigenvectors_count=len(vecs),
         rational_eigenvectors=normalize_vectors(vecs),
     )
 
 
 if __name__ == "__main__":
+    # Set up logging.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s] [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     # Parse command-line arguments.
     parser = argparse.ArgumentParser()
     parser.add_argument("savepath", type=pathlib.Path)
@@ -210,6 +179,8 @@ if __name__ == "__main__":
         default=1000000,
         help="Upper bound of integers to check",
     )
+    parser.add_argument("--num-primes", type=int, required=False, default=None)
+    parser.add_argument("--upto", type=int, default=None, help="Compute eigenvalues up to this bound. Defaults to the Sturm bound for the level.")
     parser.add_argument(
         "--seed", type=int, required=False, default=random.randint(0, 2**32 - 1)
     )
@@ -218,41 +189,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Attempt to create the path for saving oldforms.
-    oldforms_path = args.savepath / "oldforms"
-    os.makedirs(oldforms_path, exist_ok=True)
-
     # Use as many workers as requested.
     pool = ProcessPoolExecutor(max_workers=args.max_workers)
 
-    # Generate list of jobs for calculating eigenforms for squarefree 6-primes.
-    six_primes = filter(is_squarefree_six_prime, range(args.lower, args.upper))
-    jobs = list(map(partial(generate_jobs, seed=args.seed), six_primes))
-
-    # Deduplicate all observed fully ramified levels.
-    fully_ramified_levels = set(job.ramified_primes_product for job in jobs)
-
-    # Generate old forms.
-    subjobs = map(partial(generate_subjobs, seed=args.seed), fully_ramified_levels)
-    subtasks = [
-        pool.submit(find_rational_eigenvectors_at_fully_ramified_level, subjob)
-        for subjob in subjobs
-    ]
-
-    # Process each subtask as it completes and save results to disk.
-    for subtask in as_completed(subtasks):
-        try:
-            result = subtask.result()
-        except Exception:
-            LOGGER.exception("Unexpected error occurred while processing task.")
-        else:
-            savepath = oldforms_path / f"{result.subjob.level}.json"
-            with open(savepath, "w") as f:
-                f.write(result.json(indent=2))
-
-    # Now that the subtasks are completed, process the primary jobs.
+    # Generate list of squarefree primes.
+    squarefree_primes = filter(partial(is_squarefree, num_primes=args.num_primes), range(args.lower, args.upper))
+    jobs = map(partial(generate_jobs, seed=args.seed, upto=args.upto), squarefree_primes)
     tasks = [pool.submit(find_rational_eigenvectors, job=job) for job in jobs]
-    for task in as_completed(tasks):
+    LOGGER.info("Submitting %s tasks using %s worker(s)", len(tasks), args.max_workers)
+    for n, task in enumerate(as_completed(tasks)):
         try:
             result = task.result()
         except Exception:
@@ -260,4 +205,5 @@ if __name__ == "__main__":
         else:
             savepath = args.savepath / f"{result.job.level}.json"
             with open(savepath, "w") as f:
-                f.write(result.json(indent=2))
+                f.write(result.json())
+            LOGGER.info("(%s / %s) Finished computing eigenvalues at level %s", n+1, len(tasks), result.job.level)
